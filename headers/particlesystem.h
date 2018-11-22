@@ -6,8 +6,8 @@
 #include <vector>
 #include <string>
 #include <iostream>
-#include <cuda_runtime.h>
-
+//#include <cuda_runtime.h>
+using namespace std;
 
 class ParticleSystem{
 	public:
@@ -16,11 +16,14 @@ class ParticleSystem{
 	int N;
 //	vector <Particle> pvec;
 
-	float3 * pos, pos_dev;
+	float * pos, pos_dev;
 
 	public:
 
-	void generateRandomClusters(float xmin, float xmax, float ymin, float ymax, float R);
+//	ParticleSystem(int N);
+//	~ParticleSystem();
+
+	void generateRandomClusters(float xmin, float xmax, float ymin, float ymax, float R, int nc);
 	
 	void updateGroupIndices_grid();
 

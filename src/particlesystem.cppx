@@ -1,4 +1,5 @@
-#include "particlesystem.h"
+#include "../headers/particlesystem.h"
+#include "../utils/simple_math.h"
 using namespace std;
 
 
@@ -39,6 +40,7 @@ __global__ calcHash(float3 * pos, uint * hashes, uint * pids, int N){
 	
 }
 
-ParticleSystem::generateRandomClusters(float xmin, float xmax, float ymin, float ymax, float R){
 
-}
+
+
+
