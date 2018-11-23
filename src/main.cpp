@@ -18,6 +18,31 @@ struct vec3{
 
 }
 
+
+struct float3{
+	float x;
+	float y;
+	float z;
+};
+
+struct int3{
+	int x;
+	int y;
+	int z;
+};
+
+struct int2{
+	int x, y;
+};
+
+
+struct Params{
+	float3 cellSize;
+	int3 gridSize;
+	float3 origin;
+} par;
+
+
 bool compare_z(const fl::vec3& p1, const fl::vec3& p2){
 	return (p1.z < p2.z);
 }
@@ -252,6 +277,8 @@ class PointCloud{
 	float distance(int p, int q);
 	
 	void group_serial(float Rg);
+	
+	void calcGridParams(float Rg, Params & par);
 	void group_grid(float Rg);
 
 };
@@ -265,7 +292,7 @@ int main(int argc, char **argv){
 //	cr.dem.printToFile("dem.txt");
 //	cr.subtractDEM();
 //	cr.deleteGround();
-	cr.generateRandomClusters(10000, 500, -100, 100, -100, 100, 0, 10, 2);
+	cr.generateRandomClusters(20, 500, -100, 100, -100, 100, 0, 10, 2);
 	
 	init_hyperGL(&argc, argv);
 
@@ -278,7 +305,7 @@ int main(int argc, char **argv){
 	for (int i=0; i<10; ++i) cout << cr.points[3*i] << " " << cr.points[3*i+1] << " " << cr.points[3*i+2] << endl;
 
 	cr.group_serial(2);
-	cr.group_grid(2);
+	cr.group_grid(20);
 
 //	vector <float> cols9z = p.map_values(&cr.points[2], cr.nverts, 3);	// map z value
 	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
@@ -429,47 +456,20 @@ void PointCloud::group_serial(float Rg){
 
 
 
-struct float3{
-	float x;
-	float y;
-	float z;
-};
-
-struct int3{
-	int x;
-	int y;
-	int z;
-};
-
-struct int2{
-	int x, y;
-};
 
 
-struct Params{
-	float3 cellSize;
-} par;
-
-int3 getIndex(float3 pos, float3 origin){
-	int3 cell;
-	cell.x = (pos.x - origin.x)/par.cellSize.x;
-	cell.y = (pos.y - origin.y)/par.cellSize.y;
-	cell.z = (pos.z - origin.z)/par.cellSize.z;
-	return cell;
-}
 
 
-void PointCloud::group_grid(float Rg){
-	
+void PointCloud::calcGridParams(float Rg, Params & par){
 	float3 * pos = (float3*)points.data();
 	par.cellSize.x = par.cellSize.y = par.cellSize.z = Rg;
 	
-	float xmin = min_element((fl::vec3*)pos, (fl::vec3*)(pos+3*nverts), compare_x)->x;
-	float xmax = max_element((fl::vec3*)pos, (fl::vec3*)(pos+3*nverts), compare_x)->x;
-	float ymin = min_element((fl::vec3*)pos, (fl::vec3*)(pos+3*nverts), compare_y)->y;
-	float ymax = max_element((fl::vec3*)pos, (fl::vec3*)(pos+3*nverts), compare_y)->y;
-	float zmin = min_element((fl::vec3*)pos, (fl::vec3*)(pos+3*nverts), compare_z)->z;
-	float zmax = max_element((fl::vec3*)pos, (fl::vec3*)(pos+3*nverts), compare_z)->z;
+	float xmin = min_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_x)->x;
+	float xmax = max_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_x)->x;
+	float ymin = min_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_y)->y;
+	float ymax = max_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_y)->y;
+	float zmin = min_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_z)->z;
+	float zmax = max_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_z)->z;
 
 	cout << "Group: " << endl;
 	cout << "x range: " << xmin << " " << xmax << endl;	  
@@ -483,13 +483,82 @@ void PointCloud::group_grid(float Rg){
 	zmin = floor(zmin/Rg)*Rg;
 	zmax = ceil(zmax/Rg)*Rg;
 
+	float3 origin;
+	origin.x = xmin; origin.y = ymin; origin.z = zmin;
+	par.origin = origin;
+
+	par.gridSize.x  =  (xmax- xmin)/ Rg ; 
+	par.gridSize.y  =  (ymax- ymin)/ Rg ; 
+	par.gridSize.z  =  (zmax- zmin)/ Rg ; 
+
 	cout << "Group: " << endl;
 	cout << "x range: " << xmin << " " << xmax << endl;	  
 	cout << "y range: " << ymin << " " << ymax << endl;		
 	cout << "z range: " << zmin << " " << zmax << endl;		
 
-	vector <int> cell_ids(nverts);
+	cout << "gridSize = " << par.gridSize.x*par.gridSize.y*par.gridSize.z << endl;
+}
 
+int3 cellIndex(float3 pos, float3 origin){
+	int3 cell;
+	cell.x = (pos.x - origin.x)/par.cellSize.x;
+	cell.y = (pos.y - origin.y)/par.cellSize.y;
+	cell.z = (pos.z - origin.z)/par.cellSize.z;
+	return cell;
+}
+
+unsigned int calcHash(int3 cell){
+	//		   iz * nx * ny                     +    iy * nx            + ix
+	return cell.z*par.gridSize.x*par.gridSize.y + cell.y*par.gridSize.x + cell.x;
+	// can use z-order curve as hash here rather than 1D cell-index
+}
+
+
+void PointCloud::group_grid(float Rg){
+	
+	calcGridParams(Rg, par);
+
+	float3 * pos = (float3*)points.data();
+	
+	// get the cell ID for each particle
+	vector <unsigned int> point_hashes(nverts);
+	vector <unsigned int> point_ids(nverts);
+	for (int i=0; i<nverts; ++i) {
+		int3 cell_id = cellIndex(pos[i], par.origin);
+		point_hashes[i] = calcHash(cell_id);
+		point_ids[i]    = i;
+	}
+
+	cout << "points, hashes: " << endl;	
+	for (int i=0; i<10; ++i) cout << point_ids[i] << " " << point_hashes[i] << "\n";
+
+	// sort particles by cell ID
+	sort(point_ids.begin(), point_ids.end(), [point_hashes](unsigned int i, unsigned int j){return point_hashes[i] < point_hashes[j];}); 
+	
+	cout << "points, hashes: " << endl;	
+	for (int i=0; i<10; ++i) cout << point_ids[i] << " " << point_hashes[point_ids[i]] << "\n";
+
+	// calc start and end of each cell
+	int ncells = par.gridSize.x*par.gridSize.y*par.gridSize.z;
+	vector <int> cell_start(ncells, -1);
+	vector <int> cell_end  (ncells, -1);
+	for (int i=1; i<nverts; ++i){
+		int k = point_ids[i];		// get ith point in sorted list
+		int kprev = point_ids[i-1];	// i-1 th point in sorted list
+		
+		if (point_hashes[k] != point_hashes[kprev]){
+			cell_start[point_hashes[k]] = i;
+			cell_end[point_hashes[kprev]] = i-1;
+		}
+	}
+	
+	cout << "ALL:" << endl;
+	for (int i=0; i<nverts; ++i)
+	cout << point_ids[i] << " " << point_hashes[point_ids[i]] << " " << endl;
+	
+	cout << "CELLS" << endl;
+	for (int i=0; i<ncells; ++i)
+	cout << i << " " << cell_start[i] << " " << cell_end[i] << endl;
 }
 
 

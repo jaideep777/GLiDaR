@@ -10,7 +10,7 @@ struct par{
 
 
 // Get the 3D index of the cell that contains the particle
-__device__ int3 getIndex(float3 pos, float3 origin){
+__device__ int3 cellIndex(float3 pos, float3 origin){
 	int3 cell;
 	cell.x = (pos.x - origin.x)/par.cellSize.x;
 	cell.y = (pos.y - origin.y)/par.cellSize.y;
@@ -19,7 +19,7 @@ __device__ int3 getIndex(float3 pos, float3 origin){
 }
 
 // calculate the hash of a given cell
-__device__ int3 cellHash(int3 cell){
+__device__ uint cellHash(int3 cell){
 	//		   iz * nx * ny                     +    iy * nx            + ix
 	return cell.z*par.gridSize.x*par.gridSize.y + cell.y*par.gridSize.x + cell.x;
 	// can use z-order curve as hash here rather than 1D cell-index
@@ -32,7 +32,7 @@ __global__ calcHash(float3 * pos, uint * hashes, uint * pids, int N){
 	uint tid = blockIdx.x*blockDim.x + threadIdx.x;
 	if (tid >= N) return;
 	
-	int3 cell = getIndex(pos[tid]);
+	int3 cell = cellIndex(pos[tid]);
 	uint hash = cellHash(cell);
 	
 	hashes[tid] = hash;
