@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <unistd.h>
 #include <cmath>
-#include <liblas/liblas.hpp>
+//#include <liblas/liblas.hpp>
 using namespace std;
 
 #include "../headers/graphics.h"
@@ -180,31 +180,31 @@ class PointCloud{
 	DigitalElevModel dem;
 
 	public:
-	void read_las(string file){
-		ifstream ifs;
-		ifs.open(file.c_str(),ios::in | ios::binary);
-		if (!ifs) cout << "Error Opening file: " << file << endl;
+//	void read_las(string file){
+//		ifstream ifs;
+//		ifs.open(file.c_str(),ios::in | ios::binary);
+//		if (!ifs) cout << "Error Opening file: " << file << endl;
 
-		liblas::ReaderFactory f;
-		liblas::Reader reader = f.CreateWithStream(ifs);
-		liblas::Header const& header = reader.GetHeader();
-		cout << "Compressed: " << ((header.Compressed() == true) ? "true\n":"false\n");
-		cout << "Signature: " << header.GetFileSignature() << '\n';
-		cout << "Points count: " << header.GetPointRecordsCount() << '\n';
-		nverts = header.GetPointRecordsCount();
+//		liblas::ReaderFactory f;
+//		liblas::Reader reader = f.CreateWithStream(ifs);
+//		liblas::Header const& header = reader.GetHeader();
+//		cout << "Compressed: " << ((header.Compressed() == true) ? "true\n":"false\n");
+//		cout << "Signature: " << header.GetFileSignature() << '\n';
+//		cout << "Points count: " << header.GetPointRecordsCount() << '\n';
+//		nverts = header.GetPointRecordsCount();
 
-		points.reserve(3*nverts);
-		
-		while (reader.ReadNextPoint()){ //count<10
-			liblas::Point const& p = reader.GetPoint();
-			points.push_back(p.GetX());
-			points.push_back(p.GetY());
-			points.push_back(p.GetZ());
+//		points.reserve(3*nverts);
+//		
+//		while (reader.ReadNextPoint()){ //count<10
+//			liblas::Point const& p = reader.GetPoint();
+//			points.push_back(p.GetX());
+//			points.push_back(p.GetY());
+//			points.push_back(p.GetZ());
 
-			//cout << p.GetX() << ", " << p.GetY() << ", " << p.GetZ() << "\n";
-		}
+//			//cout << p.GetX() << ", " << p.GetY() << ", " << p.GetZ() << "\n";
+//		}
 
-	}
+//	}
 	
 	void createDEM(float dx, float dy){
 		float xmin = min_element((fl::vec3*)points.data(), (fl::vec3*)(points.data()+3*nverts), compare_x)->x;
@@ -292,7 +292,7 @@ int main(int argc, char **argv){
 //	cr.dem.printToFile("dem.txt");
 //	cr.subtractDEM();
 //	cr.deleteGround();
-	cr.generateRandomClusters(20, 500, -100, 100, -100, 100, 0, 10, 2);
+	cr.generateRandomClusters(1000000, 500, -100, 100, -100, 100, 0, 10, 2);
 	
 	init_hyperGL(&argc, argv);
 
@@ -304,8 +304,8 @@ int main(int argc, char **argv){
 	sort_by_z(cr.points.data(), cr.points.data()+3*cr.nverts); 
 	for (int i=0; i<10; ++i) cout << cr.points[3*i] << " " << cr.points[3*i+1] << " " << cr.points[3*i+2] << endl;
 
-	cr.group_serial(2);
-	cr.group_grid(20);
+//	cr.group_serial(2);
+	cr.group_grid(0.5);
 
 //	vector <float> cols9z = p.map_values(&cr.points[2], cr.nverts, 3);	// map z value
 	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
@@ -315,6 +315,7 @@ int main(int argc, char **argv){
 	pt.setColors(&cols9z[0]);
 	vector <float> ex = calcExtent(cr.points.data(), cr.nverts, 3);
 	pt.setExtent(ex);
+	pt.pointSize = 2;
  
  
 //	vector <int> slices = z_slices(cr.points.data(), cr.nverts, 0.1);
@@ -425,6 +426,8 @@ void PointCloud::group_serial(float Rg){
 	vector <int> sz(nverts,1);
 	for (int i=0; i<nverts; ++i) par[i] = i;
 	
+	long long int pairs = 0;
+	
 	for (int p=0; p<nverts; ++p){
 		for (int q=0; q<= p; ++q) {
 
@@ -436,7 +439,7 @@ void PointCloud::group_serial(float Rg){
 			if (d2other < Rg){
 				unite(p,q, par.data(), sz.data());
 			} 
-			
+			++pairs;
 		}
 	}
 
@@ -447,6 +450,7 @@ void PointCloud::group_serial(float Rg){
 
 	T.stop(); T.printTime();
 	
+	cout << "Pairs compared = " << pairs << endl;
 //	for (int i=0; i<group_ids.size(); ++i){
 //		cout << sz[i] << " ";
 //	}
@@ -513,32 +517,47 @@ unsigned int calcHash(int3 cell){
 	// can use z-order curve as hash here rather than 1D cell-index
 }
 
+int clamp(int x, int xmin, int xmax){
+	if (x < xmin) x = xmin;
+	if (x > xmax) x = xmax;
+	return x;
+}
+
 
 void PointCloud::group_grid(float Rg){
 	
+	SimpleTimer T; T.reset(); T.start();
 	calcGridParams(Rg, par);
+	T.stop(); T.printTime("calcGrid");
 
-	float3 * pos = (float3*)points.data();
 	
-	// get the cell ID for each particle
+	float3 * pos = (float3*)points.data();
+
+	T.reset(); T.start();	
 	vector <unsigned int> point_hashes(nverts);
 	vector <unsigned int> point_ids(nverts);
+	// get the cell ID for each particle
 	for (int i=0; i<nverts; ++i) {
 		int3 cell_id = cellIndex(pos[i], par.origin);
 		point_hashes[i] = calcHash(cell_id);
 		point_ids[i]    = i;
 	}
+	T.stop(); T.printTime("cell Ids");
 
-	cout << "points, hashes: " << endl;	
-	for (int i=0; i<10; ++i) cout << point_ids[i] << " " << point_hashes[i] << "\n";
+//	cout << "points, hashes: " << endl;	
+//	for (int i=0; i<10; ++i) cout << point_ids[i] << " " << point_hashes[i] << "\n";
 
 	// sort particles by cell ID
-	sort(point_ids.begin(), point_ids.end(), [point_hashes](unsigned int i, unsigned int j){return point_hashes[i] < point_hashes[j];}); 
+	T.reset(); T.start();	
+	sort(point_ids.begin(), point_ids.end(), [&point_hashes](unsigned int i, unsigned int j){return point_hashes[i] < point_hashes[j];}); 
+	T.stop(); T.printTime("sort");
 	
-	cout << "points, hashes: " << endl;	
-	for (int i=0; i<10; ++i) cout << point_ids[i] << " " << point_hashes[point_ids[i]] << "\n";
+//	cout << "points, hashes: " << endl;	
+//	for (int i=0; i<10; ++i) cout << point_ids[i] << " " << point_hashes[point_ids[i]] << "\n";
 
-	// calc start and end of each cell
+	T.reset(); T.start();
+	// calc start and end of each cell (both reflect indices in sorted hashes list*)
+	//  -- *sorted hashes list is accessed as point_hashes[point_ids[0:nverts]]
 	int ncells = par.gridSize.x*par.gridSize.y*par.gridSize.z;
 	vector <int> cell_start(ncells, -1);
 	vector <int> cell_end  (ncells, -1);
@@ -546,19 +565,76 @@ void PointCloud::group_grid(float Rg){
 		int k = point_ids[i];		// get ith point in sorted list
 		int kprev = point_ids[i-1];	// i-1 th point in sorted list
 		
+		if (i==1) {
+			cell_start[point_hashes[kprev]] = i-1;
+		}
+		if (i==nverts-1){
+			cell_end[point_hashes[k]] = i;
+		}
+
 		if (point_hashes[k] != point_hashes[kprev]){
 			cell_start[point_hashes[k]] = i;
 			cell_end[point_hashes[kprev]] = i-1;
 		}
 	}
+	T.stop(); T.printTime("cell s/e");
+//	cout << "ALL:" << endl;
+//	for (int i=0; i<nverts; ++i)
+//	cout << point_ids[i] << " " << point_hashes[point_ids[i]] << " " << endl;
+//	
+//	cout << "CELLS" << endl;
+//	for (int i=0; i<ncells; ++i)
+//	cout << i << " " << cell_start[i] << " " << cell_end[i] << endl;
 	
-	cout << "ALL:" << endl;
-	for (int i=0; i<nverts; ++i)
-	cout << point_ids[i] << " " << point_hashes[point_ids[i]] << " " << endl;
+	vector <int> parents(nverts);
+	vector <int> sz(nverts,1);
+	for (int i=0; i<nverts; ++i) parents[i] = i;
 	
-	cout << "CELLS" << endl;
-	for (int i=0; i<ncells; ++i)
-	cout << i << " " << cell_start[i] << " " << cell_end[i] << endl;
+	long long int pairs = 0;
+	
+	T.reset(); T.start();
+	// For each particle, check particles in all neighbouring grids and group them
+	for (int i=0; i<nverts; ++i){
+		
+		float3 p1 = pos[i];
+		int3 cell = cellIndex(p1, par.origin);	// get particle cell
+//		cout << "cell: " << cell.x << ", " << cell.y << ", " << cell.z << endl;
+		for (int ix = -1; ix <=1; ++ix){
+			for (int iy = -1; iy <=1; ++iy){
+				for (int iz = -1; iz <=1; ++iz){
+					int3 cell_new;
+					cell_new.x = clamp(cell.x + ix, 0, par.gridSize.x-1);
+					cell_new.y = clamp(cell.y + iy, 0, par.gridSize.y-1);
+					cell_new.z = clamp(cell.z + iz, 0, par.gridSize.z-1);
+//					cout << "\tcell: " << cell_new.x << ", " << cell_new.y << ", " << cell_new.z << endl;
+					
+					unsigned int hash = calcHash(cell_new);
+					
+					// loop over all particles in the cell
+					for (int k=cell_start[hash]; k<=cell_end[hash]; ++k){
+						float3 p2 = pos[point_ids[k]];
+						
+						if (distance(i, point_ids[k]) < Rg) unite(i, point_ids[k], parents.data(), sz.data());
+						++pairs;
+					}
+				}
+			}
+		}
+		
+	}
+	T.stop(); T.printTime("pairs");
+	
+	T.reset(); T.start();
+	group_ids.resize(nverts);
+	for (int i=0; i<nverts; ++i){
+		group_ids[i] = root(i, parents.data());
+	}
+	T.stop(); T.printTime("gid");
+
+	
+	cout << "Pairs compared = " << pairs << endl;
+
+	
 }
 
 

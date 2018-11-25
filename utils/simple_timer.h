@@ -24,7 +24,7 @@ using namespace std;
 class SimpleTimer{
 public:
 
-    SimpleTimer(){};
+    SimpleTimer(){gettimeofday( &start_time, 0);};
     ~SimpleTimer(){};
 
     //! Start time measurement
@@ -45,7 +45,7 @@ public:
     //! _stopped_ (ie finished sessions) and the current total time
     inline float getAverageTime() const;
     
-    inline void printTime();
+    inline void printTime(string s = "");
 
 private:
 
@@ -145,9 +145,9 @@ SimpleTimer::getAverageTime() const
 
 
 // print time as string
-inline void SimpleTimer::printTime(){
+inline void SimpleTimer::printTime(string s){
 	float ms = getTime();
-	cout << "t = " << ms << " ms.\n";
+	cout << s << " | t = " << ms << " ms.\n";
 }
 
 
