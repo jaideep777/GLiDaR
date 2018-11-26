@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <unistd.h>
 #include <cmath>
-//#include <liblas/liblas.hpp>
+#include <liblas/liblas.hpp>
 using namespace std;
 
 #include "../headers/graphics.h"
@@ -180,31 +180,31 @@ class PointCloud{
 	DigitalElevModel dem;
 
 	public:
-//	void read_las(string file){
-//		ifstream ifs;
-//		ifs.open(file.c_str(),ios::in | ios::binary);
-//		if (!ifs) cout << "Error Opening file: " << file << endl;
+	void read_las(string file){
+		ifstream ifs;
+		ifs.open(file.c_str(),ios::in | ios::binary);
+		if (!ifs) cout << "Error Opening file: " << file << endl;
 
-//		liblas::ReaderFactory f;
-//		liblas::Reader reader = f.CreateWithStream(ifs);
-//		liblas::Header const& header = reader.GetHeader();
-//		cout << "Compressed: " << ((header.Compressed() == true) ? "true\n":"false\n");
-//		cout << "Signature: " << header.GetFileSignature() << '\n';
-//		cout << "Points count: " << header.GetPointRecordsCount() << '\n';
-//		nverts = header.GetPointRecordsCount();
+		liblas::ReaderFactory f;
+		liblas::Reader reader = f.CreateWithStream(ifs);
+		liblas::Header const& header = reader.GetHeader();
+		cout << "Compressed: " << ((header.Compressed() == true) ? "true\n":"false\n");
+		cout << "Signature: " << header.GetFileSignature() << '\n';
+		cout << "Points count: " << header.GetPointRecordsCount() << '\n';
+		nverts = header.GetPointRecordsCount();
 
-//		points.reserve(3*nverts);
-//		
-//		while (reader.ReadNextPoint()){ //count<10
-//			liblas::Point const& p = reader.GetPoint();
-//			points.push_back(p.GetX());
-//			points.push_back(p.GetY());
-//			points.push_back(p.GetZ());
+		points.reserve(3*nverts);
+		
+		while (reader.ReadNextPoint()){ //count<10
+			liblas::Point const& p = reader.GetPoint();
+			points.push_back(p.GetX());
+			points.push_back(p.GetY());
+			points.push_back(p.GetZ());
 
-//			//cout << p.GetX() << ", " << p.GetY() << ", " << p.GetZ() << "\n";
-//		}
+			//cout << p.GetX() << ", " << p.GetY() << ", " << p.GetZ() << "\n";
+		}
 
-//	}
+	}
 	
 	void createDEM(float dx, float dy){
 		float xmin = min_element((fl::vec3*)points.data(), (fl::vec3*)(points.data()+3*nverts), compare_x)->x;
@@ -287,12 +287,12 @@ class PointCloud{
 int main(int argc, char **argv){
 
 	PointCloud cr;
-//	cr.read_las("/home/jaideep/Data/LIDAR/2017-02-20_21-47-24.las");
-//	cr.createDEM(0.5,0.5);
-//	cr.dem.printToFile("dem.txt");
-//	cr.subtractDEM();
-//	cr.deleteGround();
-	cr.generateRandomClusters(1000000, 500, -100, 100, -100, 100, 0, 10, 2);
+	cr.read_las("/home/jaideep/Data/LIDAR/2017-02-20_21-47-24.las");
+	cr.createDEM(0.5,0.5);
+	cr.dem.printToFile("dem.txt");
+	cr.subtractDEM();
+	cr.deleteGround();
+//	cr.generateRandomClusters(10000000, 500, -100, 100, -100, 100, 0, 10, 2);
 	
 	init_hyperGL(&argc, argv);
 
@@ -305,7 +305,7 @@ int main(int argc, char **argv){
 	for (int i=0; i<10; ++i) cout << cr.points[3*i] << " " << cr.points[3*i+1] << " " << cr.points[3*i+2] << endl;
 
 //	cr.group_serial(2);
-	cr.group_grid(0.5);
+	cr.group_grid(0.2);
 
 //	vector <float> cols9z = p.map_values(&cr.points[2], cr.nverts, 3);	// map z value
 	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
@@ -315,7 +315,7 @@ int main(int argc, char **argv){
 	pt.setColors(&cols9z[0]);
 	vector <float> ex = calcExtent(cr.points.data(), cr.nverts, 3);
 	pt.setExtent(ex);
-	pt.pointSize = 2;
+//	pt.pointSize = 2;
  
  
 //	vector <int> slices = z_slices(cr.points.data(), cr.nverts, 0.1);
@@ -616,6 +616,8 @@ void PointCloud::group_grid(float Rg){
 						
 						if (distance(i, point_ids[k]) < Rg) unite(i, point_ids[k], parents.data(), sz.data());
 						++pairs;
+						
+//						if (pairs % 1000000 == 0) cout << "pairs : " << pairs << endl;
 					}
 				}
 			}
