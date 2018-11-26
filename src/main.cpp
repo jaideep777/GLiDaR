@@ -287,12 +287,12 @@ class PointCloud{
 int main(int argc, char **argv){
 
 	PointCloud cr;
-	cr.read_las("/home/jaideep/Data/LIDAR/2017-02-20_21-47-24.las");
-	cr.createDEM(0.5,0.5);
-	cr.dem.printToFile("dem.txt");
-	cr.subtractDEM();
-	cr.deleteGround();
-//	cr.generateRandomClusters(10000000, 500, -100, 100, -100, 100, 0, 10, 2);
+//	cr.read_las("/home/jaideep/Data/LIDAR/2017-02-20_21-47-24.las");
+//	cr.createDEM(0.5,0.5);
+//	cr.dem.printToFile("dem.txt");
+//	cr.subtractDEM();
+//	cr.deleteGround();
+	cr.generateRandomClusters(4000000, 500, -100, 100, -100, 100, 0, 10, 2);
 	
 	init_hyperGL(&argc, argv);
 
@@ -305,7 +305,7 @@ int main(int argc, char **argv){
 	for (int i=0; i<10; ++i) cout << cr.points[3*i] << " " << cr.points[3*i+1] << " " << cr.points[3*i+2] << endl;
 
 //	cr.group_serial(2);
-	cr.group_grid(0.2);
+	cr.group_grid(0.5);
 
 //	vector <float> cols9z = p.map_values(&cr.points[2], cr.nverts, 3);	// map z value
 	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
@@ -511,7 +511,7 @@ int3 cellIndex(float3 pos, float3 origin){
 	return cell;
 }
 
-unsigned int calcHash(int3 cell){
+unsigned int cellHash(int3 cell){
 	//		   iz * nx * ny                     +    iy * nx            + ix
 	return cell.z*par.gridSize.x*par.gridSize.y + cell.y*par.gridSize.x + cell.x;
 	// can use z-order curve as hash here rather than 1D cell-index
@@ -525,6 +525,124 @@ int clamp(int x, int xmin, int xmax){
 
 
 void PointCloud::group_grid(float Rg){
+	
+	SimpleTimer T; T.reset(); T.start();
+	calcGridParams(Rg, par);
+	T.stop(); T.printTime("calcGrid");
+
+	
+	float3 * pos = (float3*)points.data();
+
+	T.reset(); T.start();	
+	vector <unsigned int> point_hashes(nverts);
+	vector <unsigned int> point_ids(nverts);
+	// get the cell ID for each particle
+	for (int i=0; i<nverts; ++i) {
+		int3 cell_id = cellIndex(pos[i], par.origin);
+		point_hashes[i] = cellHash(cell_id);
+		point_ids[i]    = i;
+	}
+	T.stop(); T.printTime("cell Ids");
+
+//	cout << "points, hashes: " << endl;	
+//	for (int i=0; i<10; ++i) cout << point_ids[i] << " " << point_hashes[i] << "\n";
+
+	// sort particles by cell ID
+	T.reset(); T.start();	
+	sort(point_ids.begin(), point_ids.end(), [&point_hashes](unsigned int i, unsigned int j){return point_hashes[i] < point_hashes[j];}); 
+	T.stop(); T.printTime("sort");
+	
+//	cout << "points, hashes: " << endl;	
+//	for (int i=0; i<10; ++i) cout << point_ids[i] << " " << point_hashes[point_ids[i]] << "\n";
+
+	T.reset(); T.start();
+	// calc start and end of each cell (both reflect indices in sorted hashes list*)
+	//  -- *sorted hashes list is accessed as point_hashes[point_ids[0:nverts]]
+	int ncells = par.gridSize.x*par.gridSize.y*par.gridSize.z;
+	vector <int> cell_start(ncells, -1);
+	vector <int> cell_end  (ncells, -1);
+	for (int i=1; i<nverts; ++i){
+		int k = point_ids[i];		// get ith point in sorted list
+		int kprev = point_ids[i-1];	// i-1 th point in sorted list
+		
+		if (i==1) {
+			cell_start[point_hashes[kprev]] = i-1;
+		}
+		if (i==nverts-1){
+			cell_end[point_hashes[k]] = i;
+		}
+
+		if (point_hashes[k] != point_hashes[kprev]){
+			cell_start[point_hashes[k]] = i;
+			cell_end[point_hashes[kprev]] = i-1;
+		}
+	}
+	T.stop(); T.printTime("cell s/e");
+//	cout << "ALL:" << endl;
+//	for (int i=0; i<nverts; ++i)
+//	cout << point_ids[i] << " " << point_hashes[point_ids[i]] << " " << endl;
+//	
+//	cout << "CELLS" << endl;
+//	for (int i=0; i<ncells; ++i)
+//	cout << i << " " << cell_start[i] << " " << cell_end[i] << endl;
+	
+	vector <int> parents(nverts);
+	vector <int> sz(nverts,1);
+	for (int i=0; i<nverts; ++i) parents[i] = i;
+	
+	long long int pairs = 0;
+	
+	T.reset(); T.start();
+	// For each particle, check particles in all neighbouring grids and group them
+	for (int i=0; i<nverts; ++i){
+		
+		float3 p1 = pos[i];
+		int3 cell = cellIndex(p1, par.origin);	// get particle cell
+//		cout << "cell: " << cell.x << ", " << cell.y << ", " << cell.z << endl;
+		for (int ix = -1; ix <=1; ++ix){
+			for (int iy = -1; iy <=1; ++iy){
+				for (int iz = -1; iz <=1; ++iz){
+					int3 cell_new;
+					cell_new.x = clamp(cell.x + ix, 0, par.gridSize.x-1);
+					cell_new.y = clamp(cell.y + iy, 0, par.gridSize.y-1);
+					cell_new.z = clamp(cell.z + iz, 0, par.gridSize.z-1);
+//					cout << "\tcell: " << cell_new.x << ", " << cell_new.y << ", " << cell_new.z << endl;
+					
+					unsigned int hash = cellHash(cell_new);
+					
+					// loop over all particles in the cell
+					for (int k=cell_start[hash]; k<=cell_end[hash]; ++k){
+						float3 p2 = pos[point_ids[k]];
+						
+						if (distance(i, point_ids[k]) < Rg) unite(i, point_ids[k], parents.data(), sz.data());
+						++pairs;
+						
+//						if (pairs % 1000000 == 0) cout << "pairs : " << pairs << endl;
+					}
+				}
+			}
+		}
+		
+	}
+	T.stop(); T.printTime("pairs");
+	
+	T.reset(); T.start();
+	group_ids.resize(nverts);
+	for (int i=0; i<nverts; ++i){
+		group_ids[i] = root(i, parents.data());
+	}
+	T.stop(); T.printTime("gid");
+
+	
+	cout << "Pairs compared = " << pairs << endl;
+
+	
+}
+
+
+
+
+void PointCloud::group_hashedGrid(float Rg){
 	
 	SimpleTimer T; T.reset(); T.start();
 	calcGridParams(Rg, par);
@@ -559,8 +677,12 @@ void PointCloud::group_grid(float Rg){
 	// calc start and end of each cell (both reflect indices in sorted hashes list*)
 	//  -- *sorted hashes list is accessed as point_hashes[point_ids[0:nverts]]
 	int ncells = par.gridSize.x*par.gridSize.y*par.gridSize.z;
-	vector <int> cell_start(ncells, -1);
-	vector <int> cell_end  (ncells, -1);
+	vector <int> cell_hashes;
+	vector <int> cell_start;
+	vector <int> cell_end;
+	cell_hashes.reserve(nverts);	// number of non-empty cells can never exceed nverts
+	cell_start.reserve(nverts);		// number of non-empty cells can never exceed nverts
+	cell_end.reserve(nverts);		// number of non-empty cells can never exceed nverts
 	for (int i=1; i<nverts; ++i){
 		int k = point_ids[i];		// get ith point in sorted list
 		int kprev = point_ids[i-1];	// i-1 th point in sorted list
@@ -638,9 +760,6 @@ void PointCloud::group_grid(float Rg){
 
 	
 }
-
-
-
 
 
 
