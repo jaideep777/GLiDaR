@@ -280,10 +280,6 @@ class PointCloud{
 	
 	void calcGridParams(float Rg, Params & par);
 	void group_grid(float Rg);
-	
-	int3 mergeCells(int c1, int c2, float Rg, map <int, int2> & cells, vector <unsigned int> & pt_ids);	
-	void group_grid_map(float Rg);
-	void group_grid_hash(float Rg);
 
 };
 
@@ -291,12 +287,12 @@ class PointCloud{
 int main(int argc, char **argv){
 
 	PointCloud cr;
-	cr.read_las("/home/jaideep/Data/LIDAR/2017-02-20_21-47-24.las");
-	cr.createDEM(0.5,0.5);
-	cr.dem.printToFile("dem.txt");
-	cr.subtractDEM();
-	cr.deleteGround();
-//	cr.generateRandomClusters(16000000, 500, -100, 100, -100, 100, 0, 10, 2);
+//	cr.read_las("/home/jaideep/Data/LIDAR/2017-02-20_21-47-24.las");
+//	cr.createDEM(0.5,0.5);
+////	cr.dem.printToFile("dem.txt");
+//	cr.subtractDEM();
+//	cr.deleteGround();
+	cr.generateRandomClusters(8000000, 500, -100, 100, -100, 100, 0, 10, 2);
 	
 	init_hyperGL(&argc, argv);
 
@@ -309,7 +305,7 @@ int main(int argc, char **argv){
 	for (int i=0; i<10; ++i) cout << cr.points[3*i] << " " << cr.points[3*i+1] << " " << cr.points[3*i+2] << endl;
 
 //	cr.group_serial(2);
-	cr.group_grid_map(0.1);
+	cr.group_grid(0.2);
 
 //	vector <float> cols9z = p.map_values(&cr.points[2], cr.nverts, 3);	// map z value
 	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
@@ -319,10 +315,10 @@ int main(int argc, char **argv){
 	pt.setColors(&cols9z[0]);
 	vector <float> ex = calcExtent(cr.points.data(), cr.nverts, 3);
 	pt.setExtent(ex);
-	pt.pointSize = 2;
+//	pt.pointSize = 2;
  
  
-//	vector <int> slices = z_slices(cr.points.data(), cr.nverts, 0.1);
+//	vector <int> slices = z_slices(cr.points.data(), cr.nverts, 0.3);
 ////	vector <int> slices = y_slices(cr.points.data(), cr.nverts, 10);
 //	for (int i=0; i<slices.size(); ++i){
 //		cout << "slices: " << slices[i] << ": " << cr.points[3*slices[i]+2] << "\n";
@@ -644,147 +640,128 @@ void PointCloud::group_grid(float Rg){
 }
 
 
-int3 PointCloud::mergeCells(int c1, int c2, float Rg, map <int, int2> & cells, vector <unsigned int> & pt_ids){
-	int3 result; // (yes/no, point_id1, point_id2)
-	result.x = result.y = result.z = 0;
-
-	map <int, int2>::iterator ic1 = cells.find(c1);
-	map <int, int2>::iterator ic2 = cells.find(c2);
-	if (ic1 == cells.end() || ic2 == cells.end()) return result; // if either cell doesnt exist, cant merge cells
-	
-	for (int p1 = ic1->second.x; p1 <= ic1->second.y; ++p1){	
-		for (int p2 = ic2->second.x; p2 <= ic2->second.y; ++p2){
-			int ip1 = pt_ids[p1];
-			int ip2 = pt_ids[p2];
-			if (distance(ip1, ip2) < Rg){
-				result.x = 1;
-				result.y = ip1;
-				result.z = ip2;
-				return result;
-			} 
-		}
-	}
-	
-	return result;
-}
 
 
-void PointCloud::group_grid_map(float Rg){
+//void PointCloud::group_hashedGrid(float Rg){
+//	
+//	SimpleTimer T; T.reset(); T.start();
+//	calcGridParams(Rg, par);
+//	T.stop(); T.printTime("calcGrid");
 
-	SimpleTimer T; T.reset(); T.start();
-	calcGridParams(Rg/sqrt(3), par);
-	T.stop(); T.printTime("calcGrid");
+//	
+//	float3 * pos = (float3*)points.data();
 
-	
-	float3 * pos = (float3*)points.data();
-
-	T.reset(); T.start();	
-	vector <unsigned int> point_hashes(nverts);
-	vector <unsigned int> point_ids(nverts);
-	// get the cell ID for each particle
-	for (int i=0; i<nverts; ++i) {
-		int3 cell_id = cellIndex(pos[i], par.origin);
-		point_hashes[i] = cellHash(cell_id);
-		point_ids[i]    = i;
-	}
-	T.stop(); T.printTime("cell Ids");
-
-
-	// sort particles by cell ID
-	T.reset(); T.start();	
-	sort(point_ids.begin(), point_ids.end(), [&point_hashes](unsigned int i, unsigned int j){return point_hashes[i] < point_hashes[j];}); 
-	T.stop(); T.printTime("sort");
-
-	vector <int> parents(nverts);
-	vector <int> sz(nverts,1);
-	for (int i=0; i<nverts; ++i) parents[i] = i;
-
-//	cout << "ALL:" << endl;
-//	for (int i=0; i<30; ++i)
-//	cout << point_ids[i] << " " << point_hashes[point_ids[i]] << " " << endl;
-
-	map <int, int2> filled_cells;
-	
-	// Merge all points in a given cell into same group
-	T.reset(); T.start();
-	// start and end of each cell (both reflect indices in sorted hashes list*)
-	//  -- *sorted hashes list is accessed as point_hashes[point_ids[0:nverts]]
-	int start = 0, next=1;
-	int cellStart = point_ids[start];
-	while (next < nverts){
-		int cellNext = point_ids[next];
-		if (point_hashes[cellNext] == point_hashes[cellStart]){
-			unite(cellNext, cellStart, parents.data(), sz.data());
-			//cout << "uniting " << cellStart << "|" << cellNext << " (" << point_hashes[cellStart] << "|" << point_hashes[cellNext] << endl;  
-		}
-		else {
-			int2 se; se.x = start; se.y = next-1;
-			filled_cells[point_hashes[cellStart]] = se;
-
-			start = next;
-			cellStart = cellNext; 
-		}
-		++next;
-	}
-	T.stop(); T.printTime("cell s/e");
-
-
-//	cout << "ALL:" << endl;
-//	for (int i=0; i<30; ++i)
-//	cout << point_ids[i] << " " << point_hashes[point_ids[i]] << " " << group_ids[point_ids[i]] << endl;
-
-//	cout << "MAP (" << filled_cells.size() << "):" << endl;	
-//	int i=0;
-//	for (map<int,int2>::iterator it = filled_cells.begin(); it != filled_cells.end(); ++it){
-//		cout << it->first << " " << it->second.x << " " << it->second.y << "\n";
-//		++i; if (i >10) break;
+//	T.reset(); T.start();	
+//	vector <unsigned int> point_hashes(nverts);
+//	vector <unsigned int> point_ids(nverts);
+//	// get the cell ID for each particle
+//	for (int i=0; i<nverts; ++i) {
+//		int3 cell_id = cellIndex(pos[i], par.origin);
+//		point_hashes[i] = calcHash(cell_id);
+//		point_ids[i]    = i;
 //	}
-//	cout << (--filled_cells.end())->first << " " << (--filled_cells.end())->second.x << " " << (--filled_cells.end())->second.y << endl;
-//	// 
-	
-	// group grid cells
-	long long int pairs = 0;
-	T.reset(); T.start();
-	for (map<int,int2>::iterator it = filled_cells.begin(); it != filled_cells.end(); ++it){
+//	T.stop(); T.printTime("cell Ids");
 
-		int c1 = it->first;
+////	cout << "points, hashes: " << endl;	
+////	for (int i=0; i<10; ++i) cout << point_ids[i] << " " << point_hashes[i] << "\n";
 
-		int3 cell;
-		cell.z = int(c1/par.gridSize.x/par.gridSize.y);
-		cell.y = int((c1 - cell.z*par.gridSize.x*par.gridSize.y)/par.gridSize.x);
-		cell.x = int((c1 - cell.z*par.gridSize.x*par.gridSize.y - cell.y*par.gridSize.x));
-		
-		for (int ix = -2; ix <=2; ++ix){
-			for (int iy = -2; iy <=2; ++iy){
-				for (int iz = -2; iz <=2; ++iz){
-					int3 cell_new;
-					cell_new.x = clamp(cell.x + ix, 0, par.gridSize.x-1);
-					cell_new.y = clamp(cell.y + iy, 0, par.gridSize.y-1);
-					cell_new.z = clamp(cell.z + iz, 0, par.gridSize.z-1);
-//					cout << "\tcell: " << cell_new.x << ", " << cell_new.y << ", " << cell_new.z << endl;
+//	// sort particles by cell ID
+//	T.reset(); T.start();	
+//	sort(point_ids.begin(), point_ids.end(), [&point_hashes](unsigned int i, unsigned int j){return point_hashes[i] < point_hashes[j];}); 
+//	T.stop(); T.printTime("sort");
+//	
+////	cout << "points, hashes: " << endl;	
+////	for (int i=0; i<10; ++i) cout << point_ids[i] << " " << point_hashes[point_ids[i]] << "\n";
 
-					int c2 = cellHash(cell_new);
-	
-					int3 res = mergeCells(c1, c2, Rg, filled_cells, point_ids);
-					if (res.x == 1) unite(res.y, res.z, parents.data(), sz.data());
+//	T.reset(); T.start();
+//	// calc start and end of each cell (both reflect indices in sorted hashes list*)
+//	//  -- *sorted hashes list is accessed as point_hashes[point_ids[0:nverts]]
+//	int ncells = par.gridSize.x*par.gridSize.y*par.gridSize.z;
+//	vector <int> cell_hashes;
+//	vector <int> cell_start;
+//	vector <int> cell_end;
+//	cell_hashes.reserve(nverts);	// number of non-empty cells can never exceed nverts
+//	cell_start.reserve(nverts);		// number of non-empty cells can never exceed nverts
+//	cell_end.reserve(nverts);		// number of non-empty cells can never exceed nverts
+//	for (int i=1; i<nverts; ++i){
+//		int k = point_ids[i];		// get ith point in sorted list
+//		int kprev = point_ids[i-1];	// i-1 th point in sorted list
+//		
+//		if (i==1) {
+//			cell_start[point_hashes[kprev]] = i-1;
+//		}
+//		if (i==nverts-1){
+//			cell_end[point_hashes[k]] = i;
+//		}
 
-					++pairs;
-//					if (pairs % 10000 == 0) cout << pairs << "pairs compared.\n"; 
-				}
-			}
-		}
-	}
-	cout << "pairs = " << pairs << endl;
-	T.stop(); T.printTime("group cells");
-	
-	T.reset(); T.start();
-	group_ids.resize(nverts);
-	for (int i=0; i<nverts; ++i){
-		group_ids[i] = root(i, parents.data());
-	}
-	T.stop(); T.printTime("gid");
+//		if (point_hashes[k] != point_hashes[kprev]){
+//			cell_start[point_hashes[k]] = i;
+//			cell_end[point_hashes[kprev]] = i-1;
+//		}
+//	}
+//	T.stop(); T.printTime("cell s/e");
+////	cout << "ALL:" << endl;
+////	for (int i=0; i<nverts; ++i)
+////	cout << point_ids[i] << " " << point_hashes[point_ids[i]] << " " << endl;
+////	
+////	cout << "CELLS" << endl;
+////	for (int i=0; i<ncells; ++i)
+////	cout << i << " " << cell_start[i] << " " << cell_end[i] << endl;
+//	
+//	vector <int> parents(nverts);
+//	vector <int> sz(nverts,1);
+//	for (int i=0; i<nverts; ++i) parents[i] = i;
+//	
+//	long long int pairs = 0;
+//	
+//	T.reset(); T.start();
+//	// For each particle, check particles in all neighbouring grids and group them
+//	for (int i=0; i<nverts; ++i){
+//		
+//		float3 p1 = pos[i];
+//		int3 cell = cellIndex(p1, par.origin);	// get particle cell
+////		cout << "cell: " << cell.x << ", " << cell.y << ", " << cell.z << endl;
+//		for (int ix = -1; ix <=1; ++ix){
+//			for (int iy = -1; iy <=1; ++iy){
+//				for (int iz = -1; iz <=1; ++iz){
+//					int3 cell_new;
+//					cell_new.x = clamp(cell.x + ix, 0, par.gridSize.x-1);
+//					cell_new.y = clamp(cell.y + iy, 0, par.gridSize.y-1);
+//					cell_new.z = clamp(cell.z + iz, 0, par.gridSize.z-1);
+////					cout << "\tcell: " << cell_new.x << ", " << cell_new.y << ", " << cell_new.z << endl;
+//					
+//					unsigned int hash = calcHash(cell_new);
+//					
+//					// loop over all particles in the cell
+//					for (int k=cell_start[hash]; k<=cell_end[hash]; ++k){
+//						float3 p2 = pos[point_ids[k]];
+//						
+//						if (distance(i, point_ids[k]) < Rg) unite(i, point_ids[k], parents.data(), sz.data());
+//						++pairs;
+//						
+////						if (pairs % 1000000 == 0) cout << "pairs : " << pairs << endl;
+//					}
+//				}
+//			}
+//		}
+//		
+//	}
+//	T.stop(); T.printTime("pairs");
+//	
+//	T.reset(); T.start();
+//	group_ids.resize(nverts);
+//	for (int i=0; i<nverts; ++i){
+//		group_ids[i] = root(i, parents.data());
+//	}
+//	T.stop(); T.printTime("gid");
+
+//	
+//	cout << "Pairs compared = " << pairs << endl;
+
+//	
+//}
 
 
-}
+
 
 
