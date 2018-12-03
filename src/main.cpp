@@ -10,7 +10,8 @@ using namespace std;
 
 namespace fl{
 
-struct vec3{
+class vec3{
+	public:
 	float x;
 	float y;
 	float z;
@@ -19,19 +20,22 @@ struct vec3{
 }
 
 
-struct float3{
+class float3{
+	public:
 	float x;
 	float y;
 	float z;
 };
 
-struct int3{
+class int3{
+	public:
 	int x;
 	int y;
 	int z;
 };
 
-struct int2{
+class int2{
+	public:
 	int x, y;
 };
 
@@ -93,6 +97,15 @@ vector <int> z_slices(float * pos, int n, float res){
 //	if (*slice_indices.end() != n-1) slice_indices.push_back(n-1);
 	return slice_indices;
 }
+
+
+
+
+
+
+
+
+
 
 
 class DigitalElevModel{
@@ -290,6 +303,7 @@ class PointCloud{
 	vector <int> noisePoints;
 	void countNeighbours(int c1, int c2, float Rd, map <int, int2> & cells, vector <unsigned int> & pt_ids, vector <int> &n_nb);
 	void denoise(float Rd);
+
 };
 
 
@@ -314,8 +328,9 @@ int main(int argc, char **argv){
 	for (int i=0; i<10; ++i) cout << cr.points[3*i] << " " << cr.points[3*i+1] << " " << cr.points[3*i+2] << endl;
 
 //	cr.group_serial(2);
-	cr.group_grid_map(2);
+//	cr.group_grid_map(2);
 //	cr.denoise(2);
+	cr.group_grid_hash(2);
 
 	vector <float> cols9z = p.map_values(&cr.points[2], cr.nverts, 3);	// map z value
 //	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
@@ -968,38 +983,158 @@ void PointCloud::denoise(float Rd){
 }
 
 
-
-
 // HASH TABLE IMPLEMENTATION OF GRID
 
 int hash3D(int3 key, int length){
-	return (key.z*377771 + key.y*677 + key.x) % length;
+	return (key.z*377771 + key.y*677 + key.x) % length;	// 2.15, 64
+//	return (key.z*377771 + key.y*133337 + key.x) % length; // 1.7, 25
+//	return (key.z*497771 + key.y*133337 + key.x) % length; // 30, 173
+//	return (key.z*497771 + key.y*677 + key.x) % length; // 1.5, 28
 }
 
 int insert(int3 key, int value, int3 * keys, int* values, int length){
-	int id = hash3D(key);
-	int count = 0;
-	while (vec[id] != 0){
-		id = (id+1)%length;
+	int id = hash3D(key, length);
+	int count = 1;
+		while (values[id] != -1){
+		id = (id+11)%length;
 		++count;
 	}
 	values[id] = value;
 	keys[id] = key;
 	return count;
+
 }
 
+
 int find(int3 key, int3 * keys, int* values, int length){
-	int id = hash3D(key);
-	while (keys[id] != key){
-		id = (id+1)%length;
+	int id = hash3D(key, length);
+	while (keys[id].x != key.x && keys[id].y != key.y && keys[id].z != key.z){
+		id = (id+11)%length;
 	}
 	return values[id];
 }
 
 
 
+void PointCloud::group_grid_hash(float Rg){
+
+	SimpleTimer T; T.reset(); T.start();
+	calcGridParams(Rg, par);
+	T.stop(); T.printTime("calcGrid");
+
+	
+	float3 * pos = (float3*)points.data();
+
+	T.reset(); T.start();	
+	vector <unsigned int> point_hashes(nverts);
+	vector <unsigned int> point_ids(nverts);
+	// get the cell ID for each particle
+	for (int i=0; i<nverts; ++i) {
+		int3 cell_id = cellIndex(pos[i], par.origin);
+		point_hashes[i] = cellHash(cell_id);
+		point_ids[i]    = i;
+	}
+	T.stop(); T.printTime("cell Ids");
 
 
+	// sort particles by cell ID
+	T.reset(); T.start();	
+	sort(point_ids.begin(), point_ids.end(), [&point_hashes](unsigned int i, unsigned int j){return point_hashes[i] < point_hashes[j];}); 
+	T.stop(); T.printTime("sort");
 
+
+	map <int, int2> filled_cells;
+	
+	// Merge all points in a given cell into same group
+	T.reset(); T.start();
+	// start and end of each cell (both reflect indices in sorted hashes list*)
+	//  -- *sorted hashes list is accessed as point_hashes[point_ids[0:nverts]]
+	int start = 0, next=1;
+	int cellStart = point_ids[start];
+	while (next < nverts){
+		int cellNext = point_ids[next];
+		if (point_hashes[cellNext] != point_hashes[cellStart]){
+			int2 se; se.x = start; se.y = next-1;
+			filled_cells[point_hashes[cellStart]] = se;
+
+			start = next;
+			cellStart = cellNext; 
+		}
+		++next;
+	}
+	T.stop(); T.printTime("cell s/e");
+
+
+	cout << "ALL:" << endl;
+	for (int i=0; i<30; ++i)
+	cout << point_ids[i] << " " << point_hashes[point_ids[i]] << " " << endl;
+
+	cout << "MAP (" << filled_cells.size() << "):" << endl;	
+	int i=0;
+	for (map<int,int2>::iterator it = filled_cells.begin(); it != filled_cells.end(); ++it){
+		cout << it->first << " " << it->second.x << " " << it->second.y << "\n";
+		++i; if (i >10) break;
+	}
+	cout << (--filled_cells.end())->first << " " << (--filled_cells.end())->second.x << " " << (--filled_cells.end())->second.y << endl;
+	// 
+
+	vector <int3> cells;
+	cells.reserve(filled_cells.size());
+	
+	for (map <int,int2>::iterator it = filled_cells.begin(); it != filled_cells.end(); ++it){
+		
+		int c1 = it->first;
+		int3 cell;
+		cell.z = int(c1/par.gridSize.x/par.gridSize.y);
+		cell.y = int((c1 - cell.z*par.gridSize.x*par.gridSize.y)/par.gridSize.x);
+		cell.x = int((c1 - cell.z*par.gridSize.x*par.gridSize.y - cell.y*par.gridSize.x));
+
+		cells.push_back(cell);
+	}
+	
+	
+	cout << "CELLS VEC:\n"; 
+	for (int i=0; i<10; ++i){
+		cout << cellHash(cells[i]) << endl;
+	}
+
+		
+	vector <int3> hashTable_keys(cells.size()*3);
+	vector <int>  hashTable_vals(cells.size()*3, -1);
+	
+	int avg_attempts = 0;
+	int max_attempts = 0;
+	for (int i=0; i<cells.size(); ++i){
+		int a = insert(cells[i], 1, hashTable_keys.data(), hashTable_vals.data(), cells.size()*3);
+		avg_attempts += a;
+		max_attempts = max(max_attempts, a);
+	}
+	cout << "Attempts: " << float(avg_attempts)/cells.size() << " " << max_attempts << endl;
+	
+}
+	
+//int hash3D(int3 key, int length){
+//	return (key.z*377771 + key.y*677 + key.x) % length;
+//}
+
+//int insert(int3 key, int value, int3 * keys, int* values, int length){
+//	int id = hash3D(key, length);
+//	int count = 1;
+//	while (values[id] != -1){
+//		id = (id+1)%length;
+//		++count;
+//	}
+//	values[id] = value;
+//	keys[id] = key;
+//	return count;
+//}
+
+//int find(int3 key, int3 * keys, int* values, int length){
+//	int id = hash3D(key, length);
+//	while (keys[id].x != key.x && keys[id].y != key.y && keys[id].z != key.z){
+//		id = (id+1)%length;
+//	}
+//	return values[id];
+//}
 
 
