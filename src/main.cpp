@@ -32,6 +32,10 @@ class int3{
 	int x;
 	int y;
 	int z;
+	
+	bool operator != (int3 v){
+		return (x != v.x || y != v.y || z != v.z);
+	}
 };
 
 class int2{
@@ -310,12 +314,12 @@ class PointCloud{
 int main(int argc, char **argv){
 
 	PointCloud cr;
-//	cr.read_las("/home/jaideep/Data/LIDAR/2017-02-20_21-47-24.las");
-//	cr.createDEM(0.5,0.5);
-//	cr.dem.printToFile("dem.txt");
-//	cr.subtractDEM();
+	cr.read_las("/home/jaideep/Data/LIDAR/2017-02-20_21-47-24.las");
+	cr.createDEM(0.5,0.5);
+	cr.dem.printToFile("dem.txt");
+	cr.subtractDEM();
 //	cr.deleteGround(0.2);
-	cr.generateRandomClusters(1000000, 500, -100, 100, -100, 100, 0, 10, 2);
+//	cr.generateRandomClusters(1000000, 500, -100, 100, -100, 100, 0, 10, 2);
 	
 	init_hyperGL(&argc, argv);
 
@@ -330,7 +334,7 @@ int main(int argc, char **argv){
 //	cr.group_serial(2);
 //	cr.group_grid_map(2);
 //	cr.denoise(2);
-	cr.group_grid_hash(2);
+	cr.group_grid_hash(0.1);
 
 	vector <float> cols9z = p.map_values(&cr.points[2], cr.nverts, 3);	// map z value
 //	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
@@ -989,31 +993,40 @@ int hash3D(int3 key, int length){
 	return (key.z*377771 + key.y*677 + key.x) % length;	// 2.15, 64
 //	return (key.z*377771 + key.y*133337 + key.x) % length; // 1.7, 25
 //	return (key.z*497771 + key.y*133337 + key.x) % length; // 30, 173
-//	return (key.z*497771 + key.y*677 + key.x) % length; // 1.5, 28
+//	return ((long long int)key.z*497771 + key.y*787 + key.x) % length; // 1.5, 28
 }
 
-int insert(int3 key, int value, int3 * keys, int* values, int length){
+int insert(int3 key, int value, int3 * keys, int* values, int* counts, int length, int* final_id = NULL){
 	int id = hash3D(key, length);
+	int hash = id;
 	int count = 1;
-		while (values[id] != -1){
+	while (values[id] != -1){ // while counts[id] != 0
 		id = (id+11)%length;
 		++count;
 	}
 	values[id] = value;
 	keys[id] = key;
+	counts[hash] = max(counts[id], count);
+	*final_id = id;
 	return count;
 
 }
 
 
-int find(int3 key, int3 * keys, int* values, int length){
+int hash_find(int3 key, int3 * keys, int* values, int* counts, int length, int& attempts){
 	int id = hash3D(key, length);
-	while (keys[id].x != key.x && keys[id].y != key.y && keys[id].z != key.z){
+	int hash = id;
+	int count = 1; attempts = count;
+	while (keys[id] != key){ //(keys[id].x != key.x || keys[id].y != key.y || keys[id].z != key.z){
 		id = (id+11)%length;
+		++count;
+		attempts = count;
+		if (count > counts[hash]) return -1;
 	}
-	return values[id];
+	return id;
 }
 
+#define printCell(cell) "(" << cell.x << "," << cell.y << "," << cell.z << ")"
 
 
 void PointCloud::group_grid_hash(float Rg){
@@ -1078,6 +1091,7 @@ void PointCloud::group_grid_hash(float Rg){
 	cout << (--filled_cells.end())->first << " " << (--filled_cells.end())->second.x << " " << (--filled_cells.end())->second.y << endl;
 	// 
 
+	T.reset(); T.start();
 	vector <int3> cells;
 	cells.reserve(filled_cells.size());
 	
@@ -1091,6 +1105,7 @@ void PointCloud::group_grid_hash(float Rg){
 
 		cells.push_back(cell);
 	}
+	T.stop(); T.printTime("map cells");
 	
 	
 	cout << "CELLS VEC:\n"; 
@@ -1098,19 +1113,60 @@ void PointCloud::group_grid_hash(float Rg){
 		cout << cellHash(cells[i]) << endl;
 	}
 
-		
-	vector <int3> hashTable_keys(cells.size()*3);
-	vector <int>  hashTable_vals(cells.size()*3, -1);
+	int hashTable_size = 6000011;
+	vector <int3> hashTable_keys(hashTable_size);
+	vector <int>  hashTable_vals(hashTable_size, -1);
+	vector <int>  hashTable_counts(hashTable_size, 0);
+	
+	vector <int> final_hash_ids(hashTable_size, -1);
 	
 	int avg_attempts = 0;
 	int max_attempts = 0;
 	for (int i=0; i<cells.size(); ++i){
-		int a = insert(cells[i], 1, hashTable_keys.data(), hashTable_vals.data(), cells.size()*3);
+		int a = insert(cells[i], 1, hashTable_keys.data(), hashTable_vals.data(), hashTable_counts.data(), hashTable_size, &final_hash_ids[i]);
 		avg_attempts += a;
 		max_attempts = max(max_attempts, a);
 	}
-	cout << "Attempts: " << float(avg_attempts)/cells.size() << " " << max_attempts << endl;
+	cout << "Insertion Attempts: " << float(avg_attempts)/cells.size() << " " << max_attempts << endl;
 	
+//	cout << "Counts:\n";
+//	for (int i=0; i<hashTable_counts.size(); ++i){
+//		if (hashTable_counts[i] == 0) cout << "- ";
+//		else cout << hashTable_counts[i] << " ";	
+//	}
+//	cout << endl;
+	int b;
+	int avg_attempts2 = 0;
+	int max_attempts2 = 0;
+//	cout << "Final IDs:\n";
+	for (int i=0; i<cells.size(); i=i+1){
+		int id = hash_find(cells[rand() % cells.size()], hashTable_keys.data(), hashTable_vals.data(), hashTable_counts.data(), hashTable_size, b);
+//		cout << printCell(cells[i]) << ": " << final_hash_ids[i] << ": " 
+//		     << printCell(hashTable_keys[final_hash_ids[i]]) << "  " <<  id << printCell(hashTable_keys[id]) << "\n";
+			avg_attempts2 += b;
+			max_attempts2 = max(max_attempts2, b);
+	}	
+	cout << "Retrieval Attempts (exisitng): " << float(avg_attempts2)/cells.size() << " " << max_attempts2 << endl;
+
+
+	int avg_attempts1 = 0;
+	int max_attempts1 = 0;
+	int attempts;
+//	cout << "Random IDs:\n";
+	for (int i=0; i<1000000; ++i){
+		int3 cell;
+		cell.x = rand() % 1000;
+		cell.y = rand() % 1000;
+		cell.z = rand() % 1000;
+		int id = hash_find(cell, hashTable_keys.data(), hashTable_vals.data(), hashTable_counts.data(), hashTable_size, attempts);
+//		if (id >= 0) cout << printCell(cell) << ": " << "  " <<  id << printCell(hashTable_keys[id]) << "\n";
+		//else cout << "-" << " " << id << "\n";
+		avg_attempts1 += attempts;
+		max_attempts1 = max(max_attempts1, attempts);
+	}	
+	cout << "Retrieval Attempts (random): " << float(avg_attempts1)/1000000 << " " << max_attempts1 << endl;
+	
+
 }
 	
 //int hash3D(int3 key, int length){
@@ -1136,5 +1192,8 @@ void PointCloud::group_grid_hash(float Rg){
 //	}
 //	return values[id];
 //}
+
+
+
 
 
