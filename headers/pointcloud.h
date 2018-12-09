@@ -8,43 +8,9 @@
 
 using namespace std;
 
-#ifdef __CUDACC__
+#include "../utils/simple_math.h"
+#include "grid.h"
 
-#define DEVICE_NAME __device__ __host__
-
-#else
-
-#define DEVICE_NAME 
-
-class float3{
-	public:
-	float x;
-	float y;
-	float z;
-};
-
-
-#endif
-
-
-
-//struct Params{
-//	float3 cellSize;
-//	int3 gridSize;
-//	float3 origin;
-//};
-
-
-class Grid{
-	public:
-	float3 cellSize;
-	int3 gridSize;
-	float3 origin;
-	
-	int3 DEVICE_NAME pos2cell(float3 pos);
-	int3 DEVICE_NAME index2cell(int cellID);
-	int DEVICE_NAME cell2index(int3 cell);
-};
 
 
 namespace fl{

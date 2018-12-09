@@ -12,10 +12,52 @@ using namespace std;
 const float pi = 3.14159265358;
 
 #ifdef __CUDACC__
+
 #define DEVICE_NAME __device__ __host__
+
 #else
+
 #define DEVICE_NAME 
+
+class int2{
+	public:
+	int x, y;
+};
+
+class int3{
+	public:
+	int x;
+	int y;
+	int z;
+};
+
+class float3{
+	public:
+	float x;
+	float y;
+	float z;
+};
+
+
 #endif
+
+
+
+inline DEVICE_NAME bool operator==(const int3& a, const int3& b){
+	return (a.x == b.x && a.y== b.y && a.z == b.z);
+}
+
+inline DEVICE_NAME bool operator!=(const int3& a, const int3& b){
+	return !(a == b);
+}
+
+inline DEVICE_NAME bool operator==(const int2& a, const int2& b){
+	return (a.x == b.x && a.y== b.y);
+}
+
+inline DEVICE_NAME bool operator!=(const int2& a, const int2& b){
+	return !(a == b);
+}
 
 // =============================================================================
 // 		Simple indexing utils

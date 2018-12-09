@@ -5,8 +5,8 @@
 TARGET := 1
 
 # files
-CCFILES  :=  src/graphics.cpp #$(wildcard src/*.cpp) 
-CUFILES  :=  src/main.cpp src/hashtable.cpp src/pointcloud.cpp src/neighbourcount.cpp #$(wildcard src/*.cu)
+CCFILES  :=  $(wildcard src/*.cpp) # src/graphics.cpp src/pointcloud.cpp src/main.cpp #
+CUFILES  :=  $(wildcard src/*.cu) # src/neighbourcount.cu #
 # ------------------------------------------------------------------------------
 
 # paths
@@ -23,16 +23,17 @@ GLLIB_PATH :=
 COMMONFLAGS = -m64 
 CPPFLAGS = -O3 -std=c++11 #-fPIC -Wl,--no-as-needed 
 LINKFLAGS += $(COMMONFLAGS) 
-NVFLAGS = -w -Wno-deprecated-gpu-targets -Xcompiler -O3 -std=c++11 -dc -x cu 	#-Xcompiler -fPIC
+NVFLAGS = -Wno-deprecated-gpu-targets -Xcompiler -O3 -std=c++11 -dc -x cu 	#-Xcompiler -fPIC
 
 # libs
 #LIBS = -lcudart 					# cuda libs 		-lcutil_x86_64 -lshrutil_x86_64
 GLLIBS = -lGL -lglut -lGLU -lGLEW 				# openGL libs       -lGL -lGLEW  #-lX11 -lXi -lXmu 		
-LIBS = 	 -lcudart -llas	# additional libs
+LIBS = 	 -llas	# additional libs
+CUDALIBS = -lcudart 
 
 # files
 OBJECTS = $(patsubst src/%.cpp, build/%.o, $(CCFILES))
-CU_OBJECTS = $(patsubst src/%.cpp, build/%.o, $(CUFILES))
+CU_OBJECTS = $(patsubst src/%.cu, build/%.o, $(CUFILES))
 
 # common dependencies	
 COM_DEP = 
@@ -43,7 +44,7 @@ dir:
 	mkdir -p lib build
 
 $(TARGET): $(OBJECTS) $(CU_OBJECTS)
-	nvcc $(LIB_PATH) $(GLLIB_PATH) $(CU_OBJECTS) $(OBJECTS) -o $(TARGET) -lcudart $(LIBS) $(GLLIBS)
+	nvcc $(LIB_PATH) $(GLLIB_PATH) $(CU_OBJECTS) $(OBJECTS) -o $(TARGET) $(CUDALIBS) $(LIBS) $(GLLIBS)
 #	g++ -o $(TARGET) $(LIB_PATH) $(GLLIB_PATH) gpu.o $(OBJECTS) $(LIBS) $(GLLIBS)
 
 
@@ -51,7 +52,7 @@ $(OBJECTS): build/%.o : src/%.cpp
 	g++ -c $(CPPFLAGS) $(INC_PATH) $< -o $@ 
 #	nvcc -c $(NVFLAGS) $(INC_PATH) $< -o $@ 
 
-$(CU_OBJECTS): build/%.o : src/%.cpp
+$(CU_OBJECTS): build/%.o : src/%.cu
 	nvcc -c $(NVFLAGS) $(INC_PATH) $< -o $@ 
 
 clean:
