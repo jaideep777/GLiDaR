@@ -13,6 +13,7 @@
 #include <gsl/gsl_histogram.h>
 #include <iomanip>
 #include <vector>
+#include <algorithm>
 
 #include "simple_math.h"
 
@@ -43,8 +44,8 @@ inline Histogram::Histogram(vector <float> &data, int nbins, float range_min, fl
 
 	h = gsl_histogram_alloc (nbins);
 
-	if (range_min > 9e19) range_min = arrayMin(&data[0], data.size()); //cout << "min = " << data_min << '\n';
-	if (range_max > 9e19) range_max = arrayMax(&data[0], data.size()); //cout << "min = " << data_min << '\n';
+	if (range_min > 9e19) range_min = *min_element(data.begin(), data.end()); //cout << "min = " << data_min << '\n';
+	if (range_max > 9e19) range_max = *max_element(data.begin(), data.end()); //cout << "min = " << data_min << '\n';
 
 	if (range_min == range_max) {
 		range_min -= 1e-3;
@@ -74,8 +75,8 @@ inline Histogram::Histogram(vector <float> &data, vector <float> &w, int nbins, 
 
 	h = gsl_histogram_alloc (nbins);
 
-	if (range_min > 9e19) range_min = arrayMin(&data[0], data.size()); //cout << "min = " << data_min << '\n';
-	if (range_max > 9e19) range_max = arrayMax(&data[0], data.size()); //cout << "min = " << data_min << '\n';
+	if (range_min > 9e19) range_min = *min_element(data.begin(), data.end()); //cout << "min = " << data_min << '\n';
+	if (range_max > 9e19) range_max = *max_element(data.begin(), data.end()); //cout << "min = " << data_min << '\n';
 
 	gsl_histogram_set_ranges_uniform (h, range_min, range_max);
 

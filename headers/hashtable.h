@@ -39,7 +39,7 @@ inline DEVICE_NAME int hash3D(int3 key, int length){
 }
 
 
-inline DEVICE_NAME int hash_insert(int3 key, int2 value, HashNode* ht, int length, int* final_id=NULL	){
+inline DEVICE_NAME int hash_insert(int3 key, int2 value, HashNode* ht, int length, int* final_id=NULL){
 	int id = hash3D(key, length);
 	int hash = id;
 	int count = 1;

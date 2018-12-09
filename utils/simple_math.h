@@ -12,12 +12,13 @@ using namespace std;
 const float pi = 3.14159265358;
 
 #ifdef __CUDACC__
-
-#define DEVICE_NAME __device__ __host__
-
+	#define DEVICE_NAME __device__ __host__
 #else
+	#define DEVICE_NAME /*nothing*/
+#endif
 
-#define DEVICE_NAME 
+
+#ifndef __CUDACC__
 
 class int2{
 	public:
@@ -41,6 +42,11 @@ class float3{
 
 #endif
 
+// =============================================================================
+// 		Simple vector operators
+// 		ADDED by : JAIDEEP
+// 		10 Dec 2018
+// =============================================================================
 
 
 inline DEVICE_NAME bool operator==(const int3& a, const int3& b){
@@ -135,33 +141,6 @@ inline DEVICE_NAME float periodicDistance(float x1, float x2, float X){
 }
 
 
-
-// =============================================================================
-// 		Simple array operations
-// 		ADDED by : JAIDEEP
-// 		4 Mar 2013
-// =============================================================================
-
-template <class T>
-T arraySum(T *v, int n){
-	T sum=0;
-	for (int i=0; i<n; ++i) sum += v[i];
-	return sum;
-}
-
-template <class T>
-T arrayMin(T *v, int n){
-	T amin=v[0];
-	for (int i=1; i<n; ++i) amin = min(amin, v[i]);
-	return amin;
-}
-
-template <class T>
-T arrayMax(T *v, int n){
-	T amax=v[0];
-	for (int i=1; i<n; ++i) amax = max(amax, v[i]);
-	return amax;
-}
 
 // =============================================================================
 // 		Random numbers from the default C++ generator
