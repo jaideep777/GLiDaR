@@ -26,7 +26,7 @@ bool DEVICE_NAME compare(int3 i, int3 j){
 
 // HASH TABLE IMPLEMENTATION OF GRID
 
-HashNode::HashNode(){
+DEVICE_NAME HashNode::HashNode(){
 	key.x = key.y = key.z = -1;
 	value.x = value.y = 0;
 	count = 0;
@@ -46,7 +46,7 @@ int DEVICE_NAME hash_insert(int3 key, int2 value, HashNode* ht, int length, int*
 	int id = hash3D(key, length);
 	int hash = id;
 	int count = 1;
-	while (ht[id].key != HashNode().key && ht[id].key != key){ 
+	while (!compare(ht[id].key, HashNode().key) && !compare(ht[id].key, key)){ 
 		id = (id+11)%length;
 		++count;
 	}
@@ -64,7 +64,7 @@ int DEVICE_NAME hash_find(int3 key, HashNode* ht, int length, int* attempts){
 	int hash = id;
 	int count = 1; 
 	if (attempts != NULL) *attempts = count;
-	while (ht[id].key != key){ //(keys[id].x != key.x || keys[id].y != key.y || keys[id].z != key.z){
+	while (!compare(ht[id].key, key)){ //(keys[id].x != key.x || keys[id].y != key.y || keys[id].z != key.z){
 		id = (id+11)%length;
 		++count;
 		if (attempts != NULL) *attempts = count;

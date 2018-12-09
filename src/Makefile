@@ -5,18 +5,13 @@
 TARGET := 1
 
 # files
-CCFILES  :=  $(wildcard *.cpp) 
+CCFILES  :=  #$(wildcard *.cpp) 
 CUFILES  :=  $(wildcard *.cu) 
 
 # ------------------------------------------------------------------------------
 
 # paths
 #CUDA_INSTALL_PATH ?= /usr/local/cuda#-5.0
-
-# compilers
-NVCC := nvcc -O3 #--ptxas-options=-v #,-abi=no
-CXX  := g++ -O3 -std=c++11
-LINK := g++ -std=c++11
 
 # include and lib dirs (esp for cuda)
 INC_PATH := /usr/local/liblas/include

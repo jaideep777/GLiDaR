@@ -4,7 +4,6 @@
 #include "../utils/simple_math.h"
 #include "../utils/simple_histogram.h"
 
-
 Renderer * glRenderer = NULL;
 int generic_count = 0;
 

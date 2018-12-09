@@ -15,31 +15,7 @@ using namespace std;
 
 
 
-Params par;
-
-bool compare_z(const fl::vec3& p1, const fl::vec3& p2){
-	return (p1.z < p2.z);
-}
-
-bool compare_y(const fl::vec3& p1, const fl::vec3& p2){
-	return (p1.y < p2.y);
-}
-
-bool compare_x(const fl::vec3& p1, const fl::vec3& p2){
-	return (p1.x < p2.x);
-}
-
-void sort_by_y(float* begin, float* end){
-	sort((fl::vec3*)begin, (fl::vec3*)end, compare_y); 
-}
-	
-void sort_by_z(float* begin, float* end){
-	sort((fl::vec3*)begin, (fl::vec3*)end, compare_z); 
-}
-
-void sort_by_x(float* begin, float* end){
-	sort((fl::vec3*)begin, (fl::vec3*)end, compare_x); 
-}
+Grid par;
 
 
 vector <int> y_slices(float * pos, int n, float res){
@@ -76,16 +52,16 @@ int main(int argc, char **argv){
 	PointCloud cr;
 //	cr.read_las("/home/chethana/Data/LIDAR/2017-02-20_21-47-24.las");
 //	cr.createDEM(0.5,0.5);
-//	cr.dem.printToFile("dem.txt");
+//	//cr.dem.printToFile("dem.txt");
 //	cr.subtractDEM();
-//	cr.deleteGround(0.2);
+////	cr.deleteGround(0.2);
 	cr.generateRandomClusters(1000000, 500, -100, 100, -100, 100, 0, 10, 2);
 	
 	init_hyperGL(&argc, argv);
 
 	Palette p(1000000);
-//	p.create_rainbow();
-	p.create_random();
+	p.create_rainbow();
+//	p.create_random();
 	
 	cout << "sort...\n";
 	sort_by_z(cr.points.data(), cr.points.data()+3*cr.nverts); 
@@ -93,14 +69,18 @@ int main(int argc, char **argv){
 
 //	cr.group_serial(2);
 //	cr.denoise(2);
-	cr.group_grid_hash(0.5);
+//	cr.group_grid_hash(0.2);
 //	cr.group_grid_hash2(2);
 //	cr.group_grid_hashSTL(2);
 //	cr.group_grid_map(0.5);
+	cr.denoise(1);
+	cr.countNeighbours_hash_gpu(1);
 
 //	vector <float> cols9z = p.map_values(&cr.points[2], cr.nverts, 3);	// map z value
-	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
-	vector <float> cols9z = p.map_values(gids.data(), cr.nverts, 1);	// map group ID
+//	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
+//	vector <float> cols9z = p.map_values(gids.data(), cr.nverts, 1);	// map group ID
+	vector <float> nn(cr.neighbourCounts.begin(), cr.neighbourCounts.end());
+	vector <float> cols9z = p.map_values(nn.data(), cr.nverts, 1);	// map neighbour counts
 	Shape pt(cr.nverts, 3, "points", true); //, 4, -1, 1);
 	pt.setVertices(cr.points.data());	
 	pt.setColors(&cols9z[0]);
@@ -163,20 +143,6 @@ int main(int argc, char **argv){
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Union-Find functions to calculate group Indices 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// This file contains 3 versions of union-find:
-// 		1. serial version is the standard UF algorithm. Note that latest positions 
-//		   must be copied to host before this function can be called.
-// 		2. Parallel version with pairwise comparisons in parallel followed by  
-//		   serial looping over all pairs
-//		3. Parallel_sort version with parallel pairwise comparisons followed
-//		   by atomic sorting of pairs, then serial unites over only the 
-//		   close pairs. This is the fastest version.
-//
-// Serial version supports constant and variable grouping radius 
-// Parallel versions take a constant radius of grouping from Movementparams. Variable
-// 		grouping radius code is not implemented in the parallel version because
-// 		it is not used anyway for the current simulations.
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 // given array of parents, find the root of q
@@ -200,13 +166,6 @@ void unite(int p, int q, int *par, int *sz){
 	if (i==j) return;	// if both already have the same root do nothing
 	if (sz[i] < sz[j]) {par[i]=j; sz[j] += sz[i];}
 	else 			   {par[j]=i; sz[i] += sz[j];}
-}
-
-float PointCloud::distance(int p, int q){
-	float dx = points[3*p+0] - points[3*q+0];
-	float dy = points[3*p+1] - points[3*q+1];
-	float dz = points[3*p+2] - points[3*q+2];
-	return sqrt(dx*dx + dy*dy + dz*dz);
 }
 
 
@@ -256,44 +215,6 @@ void PointCloud::group_serial(float Rg){
 
 
 
-void PointCloud::calcGridParams(float Rg, Params & par){
-	float3 * pos = (float3*)points.data();
-	par.cellSize.x = par.cellSize.y = par.cellSize.z = Rg;
-	
-	float xmin = min_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_x)->x;
-	float xmax = max_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_x)->x;
-	float ymin = min_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_y)->y;
-	float ymax = max_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_y)->y;
-	float zmin = min_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_z)->z;
-	float zmax = max_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_z)->z;
-
-	cout << "Group: " << endl;
-	cout << "x range: " << xmin << " " << xmax << endl;	  
-	cout << "y range: " << ymin << " " << ymax << endl;		
-	cout << "z range: " << zmin << " " << zmax << endl;		
-	
-	xmin = floor(xmin/Rg)*Rg;
-	xmax = ceil(xmax/Rg)*Rg;
-	ymin = floor(ymin/Rg)*Rg;
-	ymax = ceil(ymax/Rg)*Rg;
-	zmin = floor(zmin/Rg)*Rg;
-	zmax = ceil(zmax/Rg)*Rg;
-
-	float3 origin;
-	origin.x = xmin; origin.y = ymin; origin.z = zmin;
-	par.origin = origin;
-
-	par.gridSize.x  =  (xmax- xmin)/ Rg ; 
-	par.gridSize.y  =  (ymax- ymin)/ Rg ; 
-	par.gridSize.z  =  (zmax- zmin)/ Rg ; 
-
-	cout << "Group: " << endl;
-	cout << "x range: " << xmin << " " << xmax << endl;	  
-	cout << "y range: " << ymin << " " << ymax << endl;		
-	cout << "z range: " << zmin << " " << zmax << endl;		
-
-	cout << "gridSize = " << par.gridSize.x*par.gridSize.y*par.gridSize.z << endl;
-}
 
 int3 cellIndex(float3 pos, float3 origin){
 	int3 cell;
@@ -1282,11 +1203,40 @@ void PointCloud::countNeighbours(int c1, int c2, float Rd, map <int, int2> & cel
 	return;
 }
 
+int3 PointCloud::countNeighbours_hash(int3 c1, int3 c2, float Rd, HashNode * ht, vector <unsigned int> & pt_ids, int length, vector <int> &n_nb){
+	
+	int count = 0;
+	
+	int3 result; // (yes/no, point_id1, point_id2)
+	result.x = result.y = result.z = 0;
+	
+	int attempts1, attempts2;
+	int id_c1 = hash_find(c1, ht, length, &attempts1);
+	int id_c2 = hash_find(c2, ht, length, &attempts2);
+	if (id_c1 == -1 || id_c2 == -1) return result; // if either cell doesnt exist, cant merge cells
+	
+	for (int p1 = ht[id_c1].value.x; p1 <= ht[id_c1].value.y; ++p1){	
+		for (int p2 = ht[id_c2].value.x; p2 <= ht[id_c2].value.y; ++p2){
+			++count;
+			
+			int ip1 = pt_ids[p1];
+			int ip2 = pt_ids[p2];
+			if (distance(ip1, ip2) < Rd){
+				++n_nb[ip1];
+				++n_nb[ip2];			
+			} 
+		}
+	}
+//	cout << "attempts1 = " << attempts1 << " " << "attempts2 = " << attempts2 << endl;
+	particles_compared_per_cellpair += count;
+	count_pcpc += 1;
+	return result;
+}
 
 void PointCloud::denoise(float Rd){
 
 	SimpleTimer T; T.reset(); T.start();
-	calcGridParams(Rd, par);
+	calcGridParams(Rd/sqrt(3), par);
 	T.stop(); T.printTime("calcGrid");
 
 	
@@ -1309,9 +1259,22 @@ void PointCloud::denoise(float Rd){
 	sort(point_ids.begin(), point_ids.end(), [&point_hashes](unsigned int i, unsigned int j){return point_hashes[i] < point_hashes[j];}); 
 	T.stop(); T.printTime("sort");
 
+	vector <int> parents(nverts);
+	vector <int> sz(nverts,1);
+	for (int i=0; i<nverts; ++i) parents[i] = i;
 
-	map <int, int2> filled_cells;
-	
+//	cout << "ALL:" << endl;
+//	for (int i=0; i<30; ++i)
+//	cout << point_ids[i] << " " << point_hashes[point_ids[i]] << " " << endl;
+
+
+	int hashTable_size = 6000011;
+	vector <HashNode> hashTable(hashTable_size);
+
+	int n_attempts = 0;	
+	int avg_attempts = 0;
+	int max_attempts = 0;
+
 	// Merge all points in a given cell into same group
 	T.reset(); T.start();
 	// start and end of each cell (both reflect indices in sorted hashes list*)
@@ -1322,48 +1285,63 @@ void PointCloud::denoise(float Rd){
 		int cellNext = point_ids[next];
 		if (point_hashes[cellNext] != point_hashes[cellStart]){
 			int2 se; se.x = start; se.y = next-1;
-			filled_cells[point_hashes[cellStart]] = se;
+			
+			int3 cell;
+			cell.z = int(point_hashes[cellStart]/par.gridSize.x/par.gridSize.y);
+			cell.y = int((point_hashes[cellStart] - cell.z*par.gridSize.x*par.gridSize.y)/par.gridSize.x);
+			cell.x = int((point_hashes[cellStart] - cell.z*par.gridSize.x*par.gridSize.y - cell.y*par.gridSize.x));
+
+			int a = hash_insert(cell, se, hashTable.data(), hashTable_size);
+			++n_attempts;
+			avg_attempts += a;
+			max_attempts = max(max_attempts, a);
 
 			start = next;
 			cellStart = cellNext; 
 		}
+		else {
+			//unite(cellNext, cellStart, parents.data(), sz.data());
+			//cout << "uniting " << cellStart << "|" << cellNext << " (" << point_hashes[cellStart] << "|" << point_hashes[cellNext] << endl;  
+		}
 		++next;
 	}
-	T.stop(); T.printTime("cell s/e");
+	cout << "Insertion Attempts: " << float(avg_attempts)/n_attempts << " " << max_attempts << endl;
+	T.stop(); T.printTime("map cells");
 
 
-	cout << "ALL:" << endl;
-	for (int i=0; i<30; ++i)
-	cout << point_ids[i] << " " << point_hashes[point_ids[i]] << " " << endl;
+//	cout << "ALL:" << endl;
+//	for (int i=0; i<30; ++i)
+//	cout << point_ids[i] << " " << point_hashes[point_ids[i]] << " " << group_ids[point_ids[i]] << endl;
 
-	cout << "MAP (" << filled_cells.size() << "):" << endl;	
-	int i=0;
-	for (map<int,int2>::iterator it = filled_cells.begin(); it != filled_cells.end(); ++it){
-		cout << it->first << " " << it->second.x << " " << it->second.y << "\n";
-		++i; if (i >10) break;
-	}
-	cout << (--filled_cells.end())->first << " " << (--filled_cells.end())->second.x << " " << (--filled_cells.end())->second.y << endl;
-	// 
+//	cout << "MAP (" << filled_cells.size() << "):" << endl;	
+//	int i=0;
+//	for (map<int,int2>::iterator it = filled_cells.begin(); it != filled_cells.end(); ++it){
+//		cout << it->first << " " << it->second.x << " " << it->second.y << "\n";
+//		++i; if (i >10) break;
+//	}
+//	cout << (--filled_cells.end())->first << " " << (--filled_cells.end())->second.x << " " << (--filled_cells.end())->second.y << endl;
+//	// 
 
-	noisePoints.resize(nverts,0);
-	
-//	// find cells with no neighbours
+	neighbourCounts.resize(nverts,0);
+
+	particles_compared_per_cellpair = 0;
+	count_pcpc = 0;
+
+	// group grid cells
+	int n_filled_cells = 0;
 	long long int pairs = 0;
 	T.reset(); T.start();
-	for (map<int,int2>::iterator it = filled_cells.begin(); it != filled_cells.end(); ++it){
-
-		int c1 = it->first;
-
-		int3 cell;
-		cell.z = int(c1/par.gridSize.x/par.gridSize.y);
-		cell.y = int((c1 - cell.z*par.gridSize.x*par.gridSize.y)/par.gridSize.x);
-		cell.x = int((c1 - cell.z*par.gridSize.x*par.gridSize.y - cell.y*par.gridSize.x));
-
+	for (int i=0; i<hashTable_size; ++i){
+		
+		int3 cell = hashTable[i].key;
+		if (cell == HashNode().key) continue;
+		++n_filled_cells;
+		
 		int count=0;
 		
-		for (int ix = -1; ix <=1; ++ix){
-			for (int iy = -1; iy <=1; ++iy){
-				for (int iz = -1; iz <=1; ++iz){
+		for (int ix = -2; ix <=2; ++ix){
+			for (int iy = -2; iy <=2; ++iy){
+				for (int iz = -2; iz <=2; ++iz){
 					
 					int3 cell_new;
 					cell_new.x = clamp(cell.x + ix, 0, par.gridSize.x-1);
@@ -1371,10 +1349,9 @@ void PointCloud::denoise(float Rd){
 					cell_new.z = clamp(cell.z + iz, 0, par.gridSize.z-1);
 //					cout << "\tcell: " << cell_new.x << ", " << cell_new.y << ", " << cell_new.z << endl;
 
-					int c2 = cellHash(cell_new);
-					
-					if (c2 < c1){	
-						countNeighbours(c1, c2, Rd, filled_cells, point_ids, noisePoints);
+					if (cellHash(cell_new) <= cellHash(cell)){	
+//						int3 res = mergeCells(c1, c2, Rg, filled_cells, point_ids);
+						countNeighbours_hash(cell, cell_new, Rd, hashTable.data(), point_ids, hashTable_size, neighbourCounts);
 
 						++count;
 						++pairs;
@@ -1390,11 +1367,18 @@ void PointCloud::denoise(float Rd){
 	cout << "pairs = " << pairs << endl;
 	T.stop(); T.printTime("group cells");
 	
+	T.reset(); T.start();
+	group_ids.resize(nverts);
+	for (int i=0; i<nverts; ++i){
+		group_ids[i] = root(i, parents.data());
+	}
+	T.stop(); T.printTime("gid");
 	
 	cout << "Summary: \n";
 	cout << "Particle pairs compared per mergeCell: " <<  float(particles_compared_per_cellpair)/count_pcpc << endl;
 	cout << "Cells compared per cell: " <<  float(cells_compared_per_cell)/count_ccpc << endl;
-
+	cout << "No. of filled cells = " << n_filled_cells << endl;
+	
 
 }
 

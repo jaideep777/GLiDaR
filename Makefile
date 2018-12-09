@@ -6,7 +6,7 @@ TARGET := 1
 
 # files
 CCFILES  :=  $(wildcard src/*.cpp) 
-
+CUFILES  :=  $(wildcard src/*.cu)
 # ------------------------------------------------------------------------------
 
 # paths
@@ -15,14 +15,15 @@ CCFILES  :=  $(wildcard src/*.cpp)
 # compilers
 
 # include and lib dirs (esp for cuda)
-INC_PATH := -I/usr/local/liblas/include
+INC_PATH := -I/usr/local/liblas/include 
 LIB_PATH := -L/usr/local/liblas/lib
 GLLIB_PATH := 
 
 # flags
 COMMONFLAGS = -m64 
-CPPFLAGS = -O3 -Wl,--no-as-needed -std=c++11 -fPIC 
+CPPFLAGS = -O3 -std=c++11 #-fPIC -Wl,--no-as-needed 
 LINKFLAGS += $(COMMONFLAGS) 
+NVFLAGS = -Wno-deprecated-gpu-targets -Xcompiler -O3 -std=c++11 -dc -x cu 	#-Xcompiler -fPIC
 
 # libs
 #LIBS = -lcudart 					# cuda libs 		-lcutil_x86_64 -lshrutil_x86_64
@@ -31,6 +32,7 @@ LIBS = 	  -llas	# additional libs
 
 # files
 OBJECTS = $(patsubst src/%.cpp, build/%.o, $(CCFILES))
+CU_OBJECTS = $(patsubst src/%.cu, build/%.cu_o, $(CUFILES))
 
 # common dependencies	
 COM_DEP = 
@@ -40,15 +42,20 @@ all: dir $(TARGET)
 dir: 
 	mkdir -p lib build
 
-$(TARGET): $(OBJECTS) 
-	g++ -o $(TARGET) $(LIB_PATH) $(GLLIB_PATH) $(OBJECTS) $(LIBS) $(GLLIBS)
+$(TARGET): $(OBJECTS) $(CU_OBJECTS)
+	nvcc -dlink -o $(TARGET) $(LIB_PATH) $(GLLIB_PATH) $(OBJECTS) $(CU_OBJECTS) $(LIBS) $(GLLIBS)
+	g++ -o $(TARGET) $(LIB_PATH) $(GLLIB_PATH) $(OBJECTS) $(CU_OBJECTS) $(LIBS) $(GLLIBS)
 
 
 $(OBJECTS): build/%.o : src/%.cpp
-	g++ -c $(CPPFLAGS) $(INC_PATH) $< -o $@ 
+#	g++ -c $(CPPFLAGS) $(INC_PATH) $< -o $@ 
+	nvcc -c $(NVFLAGS) $(INC_PATH) $< -o $@ 
+
+$(CU_OBJECTS): build/%.cu_o : src/%.cu
+	nvcc -c $(NVFLAGS) $(INC_PATH) $< -o $@ 
 
 clean:
-	rm -f $(TARGET) build/*.o 
+	rm -f $(TARGET) build/*.o build/*.cu_o
 	
 re: clean all
 

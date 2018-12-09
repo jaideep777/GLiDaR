@@ -47,7 +47,7 @@ class HashNode{
 	int2 value;
 	int count;
 	
-	HashNode();
+	DEVICE_NAME HashNode();
 };
 
 

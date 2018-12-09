@@ -6,6 +6,54 @@
 using namespace std;
 
 
+bool compare_z(const fl::vec3& p1, const fl::vec3& p2){
+	return (p1.z < p2.z);
+}
+
+bool compare_y(const fl::vec3& p1, const fl::vec3& p2){
+	return (p1.y < p2.y);
+}
+
+bool compare_x(const fl::vec3& p1, const fl::vec3& p2){
+	return (p1.x < p2.x);
+}
+
+void sort_by_y(float* begin, float* end){
+	sort((fl::vec3*)begin, (fl::vec3*)end, compare_y); 
+}
+	
+void sort_by_z(float* begin, float* end){
+	sort((fl::vec3*)begin, (fl::vec3*)end, compare_z); 
+}
+
+void sort_by_x(float* begin, float* end){
+	sort((fl::vec3*)begin, (fl::vec3*)end, compare_x); 
+}
+
+
+int3 DEVICE_NAME Grid::pos2cell(float3 pos){
+	int3 cell;
+	cell.x = (pos.x - origin.x)/cellSize.x;
+	cell.y = (pos.y - origin.y)/cellSize.y;
+	cell.z = (pos.z - origin.z)/cellSize.z;
+	return cell;
+}
+
+int3 DEVICE_NAME Grid::index2cell(int cellID){
+	int3 cell;
+	cell.z = int( cellID / gridSize.x / gridSize.y);
+	cell.y = int((cellID - cell.z*gridSize.x*gridSize.y) / gridSize.x);
+	cell.x = int((cellID - cell.z*gridSize.x*gridSize.y - cell.y*gridSize.x));
+	return cell;
+}
+
+int DEVICE_NAME Grid::cell2index(int3 cell){
+	//		   iz * nx * ny             +    iy * nx        + ix
+	return cell.z*gridSize.x*gridSize.y + cell.y*gridSize.x + cell.x;
+	// can use z-order curve as hash here rather than 1D cell-index
+}
+
+
 void DigitalElevModel::init(int _nx, int _ny, float _dx, float _dy, float _x0, float _y0){
 	nx   = _nx;			
 	ny   = _ny;			
@@ -161,6 +209,53 @@ void PointCloud::generateRandomClusters(int N, int nc, float xmin, float xmax, f
 }
 
 
+
+void PointCloud::calcGridParams(float Rg, Grid & par){
+	float3 * pos = (float3*)points.data();
+	par.cellSize.x = par.cellSize.y = par.cellSize.z = Rg;
+	
+	float xmin = min_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_x)->x;
+	float xmax = max_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_x)->x;
+	float ymin = min_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_y)->y;
+	float ymax = max_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_y)->y;
+	float zmin = min_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_z)->z;
+	float zmax = max_element((fl::vec3*)pos, (fl::vec3*)(pos+nverts), compare_z)->z;
+
+	cout << "Points:\n";
+	cout << "x range: " << xmin << " " << xmax << endl;	  
+	cout << "y range: " << ymin << " " << ymax << endl;		
+	cout << "z range: " << zmin << " " << zmax << endl;		
+	
+	xmin = floor(xmin/Rg)*Rg;
+	xmax = ceil(xmax/Rg)*Rg;
+	ymin = floor(ymin/Rg)*Rg;
+	ymax = ceil(ymax/Rg)*Rg;
+	zmin = floor(zmin/Rg)*Rg;
+	zmax = ceil(zmax/Rg)*Rg;
+
+	float3 origin;
+	origin.x = xmin; origin.y = ymin; origin.z = zmin;
+	par.origin = origin;
+
+	par.gridSize.x  =  (xmax- xmin)/ Rg ; 
+	par.gridSize.y  =  (ymax- ymin)/ Rg ; 
+	par.gridSize.z  =  (zmax- zmin)/ Rg ; 
+
+	cout << "Grid (spacing = " << Rg << ")\n";
+	cout << "x range: " << xmin << " " << xmax << endl;	  
+	cout << "y range: " << ymin << " " << ymax << endl;		
+	cout << "z range: " << zmin << " " << zmax << endl;		
+
+	cout << "gridSize = (" << par.gridSize.x << ", " << par.gridSize.y << ", " << par.gridSize.z << ")" << endl;
+}
+
+
+float PointCloud::distance(int p, int q){
+	float dx = points[3*p+0] - points[3*q+0];
+	float dy = points[3*p+1] - points[3*q+1];
+	float dz = points[3*p+2] - points[3*q+2];
+	return sqrt(dx*dx + dy*dy + dz*dz);
+}
 
 
 

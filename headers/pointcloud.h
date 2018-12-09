@@ -26,6 +26,26 @@ class float3{
 
 #endif
 
+
+//struct Params{
+//	float3 cellSize;
+//	int3 gridSize;
+//	float3 origin;
+//};
+
+
+class Grid{
+	public:
+	float3 cellSize;
+	int3 gridSize;
+	float3 origin;
+	
+	int3 DEVICE_NAME pos2cell(float3 pos);
+	int3 DEVICE_NAME index2cell(int cellID);
+	int DEVICE_NAME cell2index(int3 cell);
+};
+
+
 namespace fl{
 
 class vec3{
@@ -37,13 +57,14 @@ class vec3{
 
 }
 
+bool compare_z(const fl::vec3& p1, const fl::vec3& p2);
+bool compare_y(const fl::vec3& p1, const fl::vec3& p2);
+bool compare_x(const fl::vec3& p1, const fl::vec3& p2);
 
+void sort_by_z(float* begin, float* end);
+void sort_by_y(float* begin, float* end);	
+void sort_by_x(float* begin, float* end);
 
-struct Params{
-	float3 cellSize;
-	int3 gridSize;
-	float3 origin;
-};
 
 
 class DigitalElevModel{
@@ -97,7 +118,7 @@ class PointCloud{
 	
 	void group_serial(float Rg);
 	
-	void calcGridParams(float Rg, Params & par);
+	void calcGridParams(float Rg, Grid& par);
 	void group_grid(float Rg);
 	
 	int3 mergeCells(int c1, int c2, float Rg, map <int, int2> & cells, vector <unsigned int> & pt_ids);	
@@ -107,13 +128,18 @@ class PointCloud{
 	void group_grid_hash(float Rg);
 	void group_grid_hash2(float Rg);
 
+	void group_grid_hash_gpu(float Rg);
+
 	int3 mergeCells_hash_stl(int3 c1, int3 c2, float Rg, unordered_map<int3,int2,KeyHasher> &ht, vector <unsigned int> & pt_ids, int length);
 	void group_grid_hashSTL(float Rg);
 
 
-	vector <int> noisePoints;
+	vector <int> neighbourCounts;
 	void countNeighbours(int c1, int c2, float Rd, map <int, int2> & cells, vector <unsigned int> & pt_ids, vector <int> &n_nb);
+	int3 countNeighbours_hash(int3 c1, int3 c2, float Rd, HashNode * ht, vector <unsigned int> & pt_ids, int length, vector <int> &n_n);
 	void denoise(float Rd);
+	
+	void countNeighbours_hash_gpu(float Rd);
 
 };
 
