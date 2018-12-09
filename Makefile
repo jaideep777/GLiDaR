@@ -5,8 +5,8 @@
 TARGET := 1
 
 # files
-CCFILES  :=  $(wildcard src/*.cpp) 
-CUFILES  :=  $(wildcard src/*.cu)
+CCFILES  :=  src/graphics.cpp #$(wildcard src/*.cpp) 
+CUFILES  :=  src/main.cpp src/hashtable.cpp src/pointcloud.cpp src/neighbourcount.cpp #$(wildcard src/*.cu)
 # ------------------------------------------------------------------------------
 
 # paths
@@ -15,8 +15,8 @@ CUFILES  :=  $(wildcard src/*.cu)
 # compilers
 
 # include and lib dirs (esp for cuda)
-INC_PATH := -I/usr/local/liblas/include 
-LIB_PATH := -L/usr/local/liblas/lib
+INC_PATH := -I/usr/local/liblas/include -I/usr/local/cuda/include 
+LIB_PATH := -L/usr/local/liblas/lib -L/usr/local/cuda/lib64
 GLLIB_PATH := 
 
 # flags
@@ -28,11 +28,11 @@ NVFLAGS = -Wno-deprecated-gpu-targets -Xcompiler -O3 -std=c++11 -dc -x cu 	#-Xco
 # libs
 #LIBS = -lcudart 					# cuda libs 		-lcutil_x86_64 -lshrutil_x86_64
 GLLIBS = -lGL -lglut -lGLU -lGLEW 				# openGL libs       -lGL -lGLEW  #-lX11 -lXi -lXmu 		
-LIBS = 	  -llas	# additional libs
+LIBS = 	 -lcudart -llas	# additional libs
 
 # files
 OBJECTS = $(patsubst src/%.cpp, build/%.o, $(CCFILES))
-CU_OBJECTS = $(patsubst src/%.cu, build/%.cu_o, $(CUFILES))
+CU_OBJECTS = $(patsubst src/%.cpp, build/%.o, $(CUFILES))
 
 # common dependencies	
 COM_DEP = 
@@ -43,15 +43,15 @@ dir:
 	mkdir -p lib build
 
 $(TARGET): $(OBJECTS) $(CU_OBJECTS)
-	nvcc -dlink -o $(TARGET) $(LIB_PATH) $(GLLIB_PATH) $(OBJECTS) $(CU_OBJECTS) $(LIBS) $(GLLIBS)
-	g++ -o $(TARGET) $(LIB_PATH) $(GLLIB_PATH) $(OBJECTS) $(CU_OBJECTS) $(LIBS) $(GLLIBS)
+	nvcc $(LIB_PATH) $(GLLIB_PATH) $(CU_OBJECTS) $(OBJECTS) -o $(TARGET) -lcudart $(LIBS) $(GLLIBS)
+#	g++ -o $(TARGET) $(LIB_PATH) $(GLLIB_PATH) gpu.o $(OBJECTS) $(LIBS) $(GLLIBS)
 
 
 $(OBJECTS): build/%.o : src/%.cpp
-#	g++ -c $(CPPFLAGS) $(INC_PATH) $< -o $@ 
-	nvcc -c $(NVFLAGS) $(INC_PATH) $< -o $@ 
+	g++ -c $(CPPFLAGS) $(INC_PATH) $< -o $@ 
+#	nvcc -c $(NVFLAGS) $(INC_PATH) $< -o $@ 
 
-$(CU_OBJECTS): build/%.cu_o : src/%.cu
+$(CU_OBJECTS): build/%.o : src/%.cpp
 	nvcc -c $(NVFLAGS) $(INC_PATH) $< -o $@ 
 
 clean:
