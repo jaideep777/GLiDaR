@@ -55,7 +55,7 @@ __global__ void countNeighbours_kernel(float Rd, float3*points_dev, int*pt_ids_d
 
 	int3 cell = ht_dev[tid].key;
 
-	if (compare(cell, HashNode().key)) return;
+	if (cell == HashNode().key) return;
 	
 //	int count=0;
 	

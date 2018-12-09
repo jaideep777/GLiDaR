@@ -23,7 +23,7 @@ GLLIB_PATH :=
 COMMONFLAGS = -m64 
 CPPFLAGS = -O3 -std=c++11 #-fPIC -Wl,--no-as-needed 
 LINKFLAGS += $(COMMONFLAGS) 
-NVFLAGS = -Wno-deprecated-gpu-targets -Xcompiler -O3 -std=c++11 -dc -x cu 	#-Xcompiler -fPIC
+NVFLAGS = -w -Wno-deprecated-gpu-targets -Xcompiler -O3 -std=c++11 -dc -x cu 	#-Xcompiler -fPIC
 
 # libs
 #LIBS = -lcudart 					# cuda libs 		-lcutil_x86_64 -lshrutil_x86_64

@@ -29,8 +29,10 @@ class int3{
 
 #endif
 
+bool DEVICE_NAME operator==(const int3& a, const int3& b);
+bool DEVICE_NAME operator!=(const int3& a, const int3& b);
 
-bool DEVICE_NAME compare(int3 i, int3 j);
+
 
 struct KeyHasher{
 	int operator()(const int3& key) const {

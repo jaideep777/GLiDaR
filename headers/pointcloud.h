@@ -27,6 +27,7 @@ class float3{
 #endif
 
 
+
 //struct Params{
 //	float3 cellSize;
 //	int3 gridSize;

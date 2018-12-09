@@ -7,7 +7,7 @@ using namespace std;
 
 #else
 
-#define DEVICE_NAME 
+#define DEVICE_NAME /*nothing*/
 
 bool int3::operator != (int3 v){
 	return (x != v.x || y != v.y || z != v.z);
@@ -19,10 +19,14 @@ bool int3::operator==(const int3 &other) const{
 
 #endif
 
-
-bool DEVICE_NAME compare(int3 i, int3 j){
-	return (i.x == j.x && i.y == j.y && i.z == j.z);
+bool DEVICE_NAME operator==(const int3& a, const int3& b){
+	return (a.x == b.x && a.y== b.y && a.z == b.z);
 }
+
+bool DEVICE_NAME operator!=(const int3& a, const int3& b){
+	return !(a == b);
+}
+
 
 // HASH TABLE IMPLEMENTATION OF GRID
 
@@ -46,7 +50,7 @@ int DEVICE_NAME hash_insert(int3 key, int2 value, HashNode* ht, int length, int*
 	int id = hash3D(key, length);
 	int hash = id;
 	int count = 1;
-	while (!compare(ht[id].key, HashNode().key) && !compare(ht[id].key, key)){ 
+	while (ht[id].key != HashNode().key && ht[id].key != key){ 
 		id = (id+11)%length;
 		++count;
 	}
@@ -64,7 +68,7 @@ int DEVICE_NAME hash_find(int3 key, HashNode* ht, int length, int* attempts){
 	int hash = id;
 	int count = 1; 
 	if (attempts != NULL) *attempts = count;
-	while (!compare(ht[id].key, key)){ //(keys[id].x != key.x || keys[id].y != key.y || keys[id].z != key.z){
+	while (ht[id].key != key){ //(keys[id].x != key.x || keys[id].y != key.y || keys[id].z != key.z){
 		id = (id+11)%length;
 		++count;
 		if (attempts != NULL) *attempts = count;
