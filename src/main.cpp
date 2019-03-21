@@ -14,7 +14,7 @@ using namespace std;
 #include <unordered_map>
 
 
-
+bool toggle_full = false;
 Grid par;
 
 
@@ -50,12 +50,12 @@ vector <int> z_slices(float * pos, int n, float res){
 int main(int argc, char **argv){
 
 	PointCloud cr;
-//	cr.read_las("/home/chethana/Data/LIDAR/2017-02-20_21-47-24.las");
-//	cr.createDEM(0.5,0.5);
+	cr.read_las("/home/chethana/Data/LIDAR/2017-02-20_21-47-24.las");
+	cr.createDEM(0.5,0.5);
 //	//cr.dem.printToFile("dem.txt");
-//	cr.subtractDEM();
+	cr.subtractDEM();
 ////	cr.deleteGround(0.2);
-	cr.generateRandomClusters(1000000, 500, -100, 100, -100, 100, 0, 10, 2);
+//	cr.generateRandomClusters(1000000, 500, -100, 100, -100, 100, 0, 10, 2);
 	
 	init_hyperGL(&argc, argv);
 
@@ -73,14 +73,14 @@ int main(int argc, char **argv){
 //	cr.group_grid_hash2(2);
 //	cr.group_grid_hashSTL(2);
 //	cr.group_grid_map(0.5);
-	cr.denoise(1);
+//	cr.denoise(1);
 //	cr.countNeighbours_hash_gpu(1);
 
-//	vector <float> cols9z = p.map_values(&cr.points[2], cr.nverts, 3);	// map z value
+	vector <float> cols9z = p.map_values(&cr.points[2], cr.nverts, 3);	// map z value
 //	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
 //	vector <float> cols9z = p.map_values(gids.data(), cr.nverts, 1);	// map group ID
-	vector <float> nn(cr.neighbourCounts.begin(), cr.neighbourCounts.end());
-	vector <float> cols9z = p.map_values(nn.data(), cr.nverts, 1);	// map neighbour counts
+//	vector <float> nn(cr.neighbourCounts.begin(), cr.neighbourCounts.end());
+//	vector <float> cols9z = p.map_values(nn.data(), cr.nverts, 1);	// map neighbour counts
 	Shape pt(cr.nverts, 3, "points", true); //, 4, -1, 1);
 	pt.setVertices(cr.points.data());	
 	pt.setColors(&cols9z[0]);
@@ -89,23 +89,23 @@ int main(int argc, char **argv){
 //	pt.pointSize = 2;
  
  
-//	vector <int> slices = z_slices(cr.points.data(), cr.nverts, 1);
-////	vector <int> slices = y_slices(cr.points.data(), cr.nverts, 10);
-//	for (int i=0; i<slices.size(); ++i){
-//		cout << "slices: " << slices[i] << ": " << cr.points[3*slices[i]+2] << "\n";
-//	}
-//	cout << endl;
+	vector <int> slices = z_slices(cr.points.data(), cr.nverts, 1);
+//	vector <int> slices = y_slices(cr.points.data(), cr.nverts, 10);
+	for (int i=0; i<slices.size(); ++i){
+		cout << "slices: " << slices[i] << ": " << cr.points[3*slices[i]+2] << "\n";
+	}
+	cout << endl;
 
-//	vector <Shape*> slices_shapes(slices.size());
-//	for (int i=1; i<slices.size(); ++i){
-//		int nv = slices[i]-slices[i-1];
-//		slices_shapes[i-1] = new Shape(nv, 3, "points", false);
-//		slices_shapes[i-1]->pointSize = 1;
-//		slices_shapes[i-1]->setVertices(&cr.points[3*slices[i-1]]);
-//		slices_shapes[i-1]->setColors(&cols9z[4*slices[i-1]]);
-//		slices_shapes[i-1]->setExtent(ex);
-//	}
-//	slices_shapes[0]->b_render = true;
+	vector <Shape*> slices_shapes(slices.size());
+	for (int i=1; i<slices.size(); ++i){
+		int nv = slices[i]-slices[i-1];
+		slices_shapes[i-1] = new Shape(nv, 3, "points", false);
+		slices_shapes[i-1]->pointSize = 1;
+		slices_shapes[i-1]->setVertices(&cr.points[3*slices[i-1]]);
+		slices_shapes[i-1]->setColors(&cols9z[4*slices[i-1]]);
+		slices_shapes[i-1]->setExtent(ex);
+	}
+	slices_shapes[0]->b_render = true;
 
 	
 	int current_render = 0;
@@ -125,10 +125,11 @@ int main(int argc, char **argv){
 	
 	
 	while(1){	   // infinite loop needed to poll anim_on signal.
-//		slices_shapes[current_render]->b_render = false;
-//		current_render = generic_count % (slices_shapes.size()-1);
-////		cout << "Currently rendering: " << current_render << "\n";
-//		slices_shapes[current_render]->b_render = true;
+		pt.b_render = toggle_full;
+		slices_shapes[current_render]->b_render = false;
+		current_render = generic_count % (slices_shapes.size()-1);
+//		cout << "Currently rendering: " << current_render << "\n";
+		slices_shapes[current_render]->b_render = true;
 		
 		glutMainLoopEvent();
 		usleep(20000);

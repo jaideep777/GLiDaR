@@ -6,6 +6,7 @@
 
 Renderer * glRenderer = NULL;
 int generic_count = 0;
+extern bool toggle_full;
 
 void loadShader(string filename, GLuint &shader_id, GLenum shader_type){
 
@@ -811,6 +812,10 @@ void keyPress(unsigned char key, int x, int y){
 		else if (key == 'x'){
 			glRenderer->toggleConsole();
 			cout << "Command-line turned on.\n";
+		}
+		else if (key == 't'){
+			toggle_full = !toggle_full;
+			cout << "toggle full display.\n";
 		}
 		else{
 		}
