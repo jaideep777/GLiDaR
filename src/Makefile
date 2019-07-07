@@ -5,7 +5,7 @@
 TARGET := 1
 
 # files
-CCFILES  :=  #$(wildcard *.cpp) 
+CCFILES  :=  $(wildcard *.cpp) 
 CUFILES  :=  $(wildcard *.cu) 
 
 # ------------------------------------------------------------------------------

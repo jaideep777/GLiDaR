@@ -684,9 +684,9 @@ bool init_hyperGL(int *argc, char **argv){
 	// init
 	glutInit(argc, argv);
 
-	glutInitContextVersion(4, 0);
-	glutInitContextFlags(GLUT_FORWARD_COMPATIBLE);
-	glutInitContextProfile(GLUT_CORE_PROFILE);
+//	glutInitContextVersion(4, 0);
+//	glutInitContextFlags(GLUT_FORWARD_COMPATIBLE);
+//	glutInitContextProfile(GLUT_CORE_PROFILE);
 
 	glutInitWindowSize(glRenderer->window_width, glRenderer->window_height);
 	glutInitDisplayMode(GLUT_DEPTH | GLUT_RGBA | GLUT_DOUBLE);

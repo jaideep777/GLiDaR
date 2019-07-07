@@ -50,18 +50,18 @@ vector <int> z_slices(float * pos, int n, float res){
 int main(int argc, char **argv){
 
 	PointCloud cr;
-	cr.read_las("/home/chethana/Data/LIDAR/2017-02-20_21-47-24.las");
-	cr.createDEM(0.5,0.5);
+//	cr.read_las("/home/chethana/Data/LIDAR/2017-02-20_21-47-24.las");
+//	cr.createDEM(0.5,0.5);
 //	//cr.dem.printToFile("dem.txt");
-	cr.subtractDEM();
+//	cr.subtractDEM();
 ////	cr.deleteGround(0.2);
-//	cr.generateRandomClusters(1000000, 500, -100, 100, -100, 100, 0, 10, 2);
+	cr.generateRandomClusters(1000000, 500, -100, 100, -100, 100, 0, 10, 2);
 	
 	init_hyperGL(&argc, argv);
 
 	Palette p(1000000);
-	p.create_rainbow();
-//	p.create_random();
+//	p.create_rainbow();
+	p.create_random();
 	
 	cout << "sort...\n";
 	sort_by_z(cr.points.data(), cr.points.data()+3*cr.nverts); 
@@ -70,15 +70,15 @@ int main(int argc, char **argv){
 //	cr.group_serial(2);
 //	cr.denoise(2);
 //	cr.group_grid_hash(0.2);
-//	cr.group_grid_hash2(2);
+	cr.group_grid_hash2(2);
 //	cr.group_grid_hashSTL(2);
 //	cr.group_grid_map(0.5);
 //	cr.denoise(1);
 //	cr.countNeighbours_hash_gpu(1);
 
-	vector <float> cols9z = p.map_values(&cr.points[2], cr.nverts, 3);	// map z value
-//	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
-//	vector <float> cols9z = p.map_values(gids.data(), cr.nverts, 1);	// map group ID
+//	vector <float> cols9z = p.map_values(&cr.points[2], cr.nverts, 3);	// map z value
+	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
+	vector <float> cols9z = p.map_values(gids.data(), cr.nverts, 1);	// map group ID
 //	vector <float> nn(cr.neighbourCounts.begin(), cr.neighbourCounts.end());
 //	vector <float> cols9z = p.map_values(nn.data(), cr.nverts, 1);	// map neighbour counts
 	Shape pt(cr.nverts, 3, "points", true); //, 4, -1, 1);

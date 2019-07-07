@@ -15,8 +15,8 @@ CUFILES  :=  $(wildcard src/*.cu) # src/neighbourcount.cu #
 # compilers
 
 # include and lib dirs (esp for cuda)
-INC_PATH := -I/usr/local/liblas/include -I/usr/local/cuda/include 
-LIB_PATH := -L/usr/local/liblas/lib -L/usr/local/cuda/lib64
+INC_PATH := -I/usr/local/liblas/include #-I/usr/local/cuda/include 
+LIB_PATH := -L/usr/local/liblas/lib #-L/usr/local/cuda/lib64
 GLLIB_PATH := 
 
 # flags
@@ -29,7 +29,7 @@ NVFLAGS = -Wno-deprecated-gpu-targets -Xcompiler -O3 -std=c++11 -dc -x cu 	#-Xco
 #LIBS = -lcudart 					# cuda libs 		-lcutil_x86_64 -lshrutil_x86_64
 GLLIBS = -lGL -lglut -lGLU -lGLEW 				# openGL libs       -lGL -lGLEW  #-lX11 -lXi -lXmu 		
 LIBS = 	 -llas	# additional libs
-CUDALIBS = -lcudart 
+CUDALIBS = #-lcudart 
 
 # files
 OBJECTS = $(patsubst src/%.cpp, build/%.o, $(CCFILES))
@@ -44,7 +44,7 @@ dir:
 	mkdir -p lib build
 
 $(TARGET): $(OBJECTS) $(CU_OBJECTS)
-	nvcc $(LIB_PATH) $(GLLIB_PATH) $(CU_OBJECTS) $(OBJECTS) -o $(TARGET) $(CUDALIBS) $(LIBS) $(GLLIBS)
+	g++ $(LIB_PATH) $(GLLIB_PATH) $(CU_OBJECTS) $(OBJECTS) -o $(TARGET) $(CUDALIBS) $(LIBS) $(GLLIBS)
 #	g++ -o $(TARGET) $(LIB_PATH) $(GLLIB_PATH) gpu.o $(OBJECTS) $(LIBS) $(GLLIBS)
 
 
