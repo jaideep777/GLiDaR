@@ -9,6 +9,6 @@ uniform sampler2D tex;
 
 void main()
 {	
-	outColor = mix(texture(tex, ex_UV), ex_col, 0.5); 
+	outColor = mix(texture(tex, ex_UV), ex_col, .99); 
 }
 

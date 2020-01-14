@@ -73,6 +73,7 @@ class PointCloud{
 	void createDEM(float dx, float dy);
 
 	void subtractDEM();
+	void subtractDEM_bil();
 	
 	void deleteGround(float ht);
 	

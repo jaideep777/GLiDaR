@@ -8,7 +8,7 @@ out vec2 ex_UV;
 out vec4 ex_col;
 
 uniform mat4 transform;
-uniform float pointsize = 2;
+uniform float pointsize = .5;
 
 void main()
 {

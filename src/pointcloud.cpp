@@ -154,6 +154,40 @@ void PointCloud::subtractDEM(){
 	}
 }	
 
+void PointCloud::subtractDEM_bil(){
+	for (int k=0; k<nverts; ++k){
+		float x = points[3*k+0], y = points[3*k+1];
+		int ix = floor((x - dem.xmin)/ dem.dx);
+		int iy = floor((y - dem.ymin)/ dem.dy);
+
+		float x1 = dem.xmin + ix*dem.dx;
+		float x2 = dem.xmin + (ix+1)*dem.dx;
+		float y1 = dem.ymin + iy*dem.dy;
+		float y2 = dem.ymin + (iy+1)*dem.dy;
+
+		float f0 = dem.elev[iy*dem.nx+ix];
+		float f1 = dem.elev[(iy+1)*dem.nx+ix];
+		float f2 = dem.elev[iy*dem.nx+ix+1];
+		float f3 = dem.elev[(iy+1)*dem.nx+ix+1];
+
+		if (f1 > 1e19) f1 = f0;
+		if (f2 > 1e19) f2 = f0;
+		if (f3 > 1e19) f3 = f0;
+
+		float f = (f0 * ((x2-x )*(y2-y ))   // f11
+				 + f2 * ((x -x1)*(y2-y ))   // f21
+				 + f1 * ((x2-x )*(y -y1))   // f12
+				 + f3 * ((x -x1)*(y -y1)))  // f22
+				 / ((x2-x1)*(y2-y1));		// x2=x1+dx, so no div-by-zero!
+
+//		if (k % 1000 == 0) cout << "elev corners: " << f0 << " " << f1 << " " <<  f2 << " " << f3 << "|" << f << endl;
+		
+		points[3*k+2] -= f;	// TODO: subract interpolated value
+
+//		if (k % 1000 == 0) cout << points[3*k+0] << " " << points[3*k+1] << " " << points[3*k+2] << endl;
+	}
+}	
+
 void PointCloud::deleteGround(float ht){
 	for (int k=0; k<nverts; ++k){
 		int ix = floor((points[3*k+0]- dem.xmin)/ dem.dx);
