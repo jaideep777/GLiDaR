@@ -5,8 +5,10 @@
 #include <algorithm>
 using namespace std;
 
+#include <quickgl.h>
+
 #include "../utils/simple_math.h"
-#include "../headers/graphics.h"
+#include "../utils/simple_timer.h"
 
 #include "../headers/hashtable.h"
 #include "../headers/pointcloud.h"
@@ -57,11 +59,11 @@ int main(int argc, char **argv){
 ////	cr.deleteGround(0.2);
 	cr.generateRandomClusters(1000000, 500, -100, 100, -100, 100, 0, 10, 2);
 	
-	init_hyperGL(&argc, argv);
+	initQuickGL(argc, argv);
 
 	Palette p(1000000);
-//	p.create_rainbow();
-	p.create_random();
+//	p.createRainbow();
+	p.createRandom();
 	
 	cout << "sort...\n";
 	sort_by_z(cr.points.data(), cr.points.data()+3*cr.nverts); 
@@ -76,16 +78,23 @@ int main(int argc, char **argv){
 //	cr.denoise(1);
 //	cr.countNeighbours_hash_gpu(1);
 
+
+	Camera cam(glm::vec3(2.f,2.f,2.f), glm::vec3(0.5f, 0.5f, 0.f), glm::vec3(0.0f, 0.0f, 1.0f));
+	cam.activate();
+
+
+	CameraController c;
+
 //	vector <float> cols9z = p.map_values(&cr.points[2], cr.nverts, 3);	// map z value
 	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
-	vector <float> cols9z = p.map_values(gids.data(), cr.nverts, 1);	// map group ID
+	vector <float> cols9z = p.mapValues(gids.data(), cr.nverts, 1, 0);	// map group ID
 //	vector <float> nn(cr.neighbourCounts.begin(), cr.neighbourCounts.end());
 //	vector <float> cols9z = p.map_values(nn.data(), cr.nverts, 1);	// map neighbour counts
-	Shape pt(cr.nverts, 3, "points", true); //, 4, -1, 1);
+	Shape pt(cr.nverts, GL_POINTS); //, 4, -1, 1);
 	pt.setVertices(cr.points.data());	
 	pt.setColors(&cols9z[0]);
-	vector <float> ex = calcExtent(cr.points.data(), cr.nverts, 3);
-	pt.setExtent(ex);
+//	vector <float> ex = calcExtent(cr.points.data(), cr.nverts, 3);
+	pt.autoExtent();
 //	pt.pointSize = 2;
  
  
@@ -119,20 +128,20 @@ int main(int argc, char **argv){
 					 0.0,0.8,1, 0.5
 				   };
 	
-	Shape axis(6, 3, "lines");
+	Shape axis(6, GL_LINES);
 	axis.setVertices(pos3);
 	axis.setColors((float*)col3);
 	
 	
-	while(1){	   // infinite loop needed to poll anim_on signal.
+//	while(1){	   // infinite loop needed to poll anim_on signal.
 //		slices_shapes[current_render]->b_render = false;
 //		current_render = generic_count % (slices_shapes.size()-1);
 ////		cout << "Currently rendering: " << current_render << "\n";
 //		slices_shapes[current_render]->b_render = true;
 		
-		glutMainLoopEvent();
-		usleep(20000);
-	}
+		glutMainLoop();
+//		usleep(20000);
+//	}
 	// launch sim end.
 	
 	return 0;
