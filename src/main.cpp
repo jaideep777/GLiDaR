@@ -53,6 +53,7 @@ int main(int argc, char **argv){
 	cr.subtractDEM_bil();
 	cr.deleteGround(0.4); // argument is the height threshold below which to delete points. if understory is thick, it will be difficult to delete ground
 //	cr.generateRandomClusters(1000000, 500, -100, 100, -100, 100, 0, 10, 2);
+	cr.write_ascii("data/2017-02-20_21-47-24.txt");
 	
 	Palette p(1000000);
 	p.createRainbow();

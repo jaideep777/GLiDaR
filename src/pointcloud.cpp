@@ -116,6 +116,19 @@ void PointCloud::read_las(string file){
 }
 
 
+
+void PointCloud::write_ascii(string file){
+
+	ofstream fout(file.c_str());
+	for (int i=0; i< nverts; ++i){
+		fout << points[3*i+0] << "\t" << points[3*i+1] << "\t" << points[3*i+2] << "\n";
+	}
+	fout.close();
+}
+
+
+
+
 void PointCloud::createDEM(float dx, float dy){
 	float xmin = min_element((fl::vec3*)points.data(), (fl::vec3*)(points.data()+3*nverts), 
 							 [](const fl::vec3& p1, const fl::vec3& p2){return (p1.x < p2.x);} )->x;

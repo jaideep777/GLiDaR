@@ -69,6 +69,7 @@ class PointCloud{
 
 	public:
 	void read_las(string file);
+	void write_ascii(string file);
 	
 	void createDEM(float dx, float dy);
 
