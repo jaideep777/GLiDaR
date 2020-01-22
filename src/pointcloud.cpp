@@ -115,6 +115,32 @@ void PointCloud::read_las(string file){
 
 }
 
+void PointCloud::write_las(string file){
+
+	std::ofstream ofs;
+	ofs.open(file.c_str(), ios::out | ios::binary);
+
+	liblas::Header header;
+//	header.SetDataFormatId(liblas::ePointFormat1); // Time only
+
+//	// Set coordinate system using GDAL support
+//	liblas::SpatialReference srs;
+//	srs.SetFromUserInput("EPSG:4326");
+
+//	header.SetSRS(srs);
+//	header.setPointRecordsCount(nverts);
+
+	liblas::Writer writer(ofs, header);
+	// here the header has been serialized to disk into the *file.las*
+
+	liblas::Point point(&header);
+	for (int i=0; i<nverts; ++i){
+		point.SetCoordinates(points[3*i+0], points[3*i+1], points[3*i+2]);
+		writer.WritePoint(point);
+	}
+	
+	ofs.close();
+}
 
 
 void PointCloud::write_ascii(string file){

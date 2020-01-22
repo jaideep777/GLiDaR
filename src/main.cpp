@@ -46,22 +46,49 @@ int main(int argc, char **argv){
 
 	initQuickGL(argc, argv);
 
+	cout << "----> Read Data" << endl;
 	PointCloud cr;
 	cr.read_las("data/2017-02-20_21-47-24.las");
+
+	cout << "----> Create DEM" << endl;
 	cr.createDEM(0.5,0.5);
 //	//cr.dem.printToFile("dem.txt");
+
+	cout << "----> Subtract DEM" << endl;
 	cr.subtractDEM_bil();
 	cr.deleteGround(0.4); // argument is the height threshold below which to delete points. if understory is thick, it will be difficult to delete ground
 //	cr.generateRandomClusters(1000000, 500, -100, 100, -100, 100, 0, 10, 2);
-	cr.write_ascii("data/2017-02-20_21-47-24.txt");
+
+//	cr.write_las("data/2017-02-20_21-47-24_processed.las");
 	
 	Palette p(1000000);
-	p.createRainbow();
-//	p.createRandom();
+//	p.createRainbow();
+	p.createRandom();
+
+	cout << "----> Group... " << endl;
+	cr.group_grid_fof64(0.02);
+//	cr.group_grid_hashSTL(0.05);
+
+	cout << "----> Denoise" << endl;	
+
+	// count connectivity
+	vector <int> cluster_size(cr.nverts, 0);
+	for (int i=0; i<cr.nverts; ++i){
+		++cluster_size[cr.group_ids[i]];
+	}
+	
+	// remove extremely small groups
+	for (int i=0; i<cr.nverts; ++i){
+		if (cluster_size[cr.group_ids[i]] < 3) cr.points[3*i+0] = cr.points[3*i+1] = cr.points[3*i+2] = 0;
+	}
 
 
-//	vector <float> cols9z = p.mapValues(gids.data(), cr.nverts, 1, 0);	// map group ID
-	vector <float> cols9z = p.mapValues(cr.points.data(), cr.nverts, 3, 2, 0);	// map z
+	cout << "----> Draw" << endl;	
+	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
+	vector <float> cols9z = p.mapValues(gids.data(), cr.nverts, 1, 0);	// map group ID
+//	vector <float> cols9z = p.mapValues(cr.points.data(), cr.nverts, 3, 2, 0);	// map z
+
+
 
 	Shape pt(cr.nverts, GL_POINTS); //, 4, -1, 1);
 	pt.setVertices(cr.points.data());	

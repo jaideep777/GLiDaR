@@ -1258,3 +1258,235 @@ void PointCloud::denoise(float Rd){
 
 
 
+
+
+
+
+
+long long int mulmod(long long int a, long long int b, long long int m) {//It returns true if number is prime otherwise false {
+   long long int x = 0, y = a % m;
+   while (b > 0) {
+      if (b % 2 == 1) {
+         x = (x + y) % m;
+      }
+      y = (y * 2) % m;
+      b /= 2;
+   }
+   return x % m;
+}
+
+long long int modulo(long long int base, long long int e, long long int m) {
+   long long int x = 1;
+   long long int y = base;
+   while (e > 0) {
+      if (e % 2 == 1)
+         x = (x * y) % m;
+         y = (y * y) % m;
+         e = e / 2;
+   }
+   return x % m;
+}
+
+bool Miller(long long int p, int iteration) {
+   if (p < 2) {
+      return false;
+   }
+   if (p != 2 && p % 2==0) {
+      return false;
+   }
+   long long int s = p - 1;
+   while (s % 2 == 0) {
+      s /= 2;
+   }
+   for (int i = 0; i < iteration; i++) {
+      long long int a = rand() % (p - 1) + 1, temp = s;
+      long long int mod = modulo(a, temp, p);
+      while (temp != p - 1 && mod != 1 && mod != p - 1) {
+         mod = mulmod(mod, mod, p);
+         temp *= 2;
+      }
+      if (mod != p - 1 && temp % 2 == 0) {
+         return false;
+      }
+   }
+   return true;
+}
+
+long long int smallest_prime_atleast(long long int m){
+	long long int n = m;
+	while(!Miller(n, 10)) ++n;
+	return n;
+}
+
+
+#include "fofcpp.cppx"
+
+void PointCloud::group_grid_fof(float Rg){
+
+//	SimpleTimer T; T.reset(); T.start();
+//	calcGridParams(Rg/sqrt(3), par);
+//	T.stop(); T.printTime("calcGrid");
+
+	
+	vector<double> pos_vec_d;
+	pos_vec_d.assign(points.begin(), points.end());
+	
+	double * pos = pos_vec_d.data();
+
+
+	int num_pos = nverts;
+	
+	float rcut = Rg;
+	
+	double minmax[6];	
+	get_min_max(pos, num_pos, minmax);
+	
+	float Lx = minmax[3]-minmax[0], Ly=minmax[4]-minmax[1], Lz=minmax[5]-minmax[2];
+	cout << "minmax: " << minmax[3] << "-" << minmax[0] << "," << minmax[4] << "-" << minmax[1] << "," <<  minmax[5] << "-" << minmax[2] << endl;
+	cout << "dx dy dz = " << Lx << " " << Ly << " " << Lz << endl;
+	float max_dim = fmax(fmax(Lx, Ly), Lz);
+	
+	
+	float cell_width = rcut / sqrt(3);
+	float inv_cell_width = 1.0/cell_width;
+
+    int n_min = (int)(ceil(max_dim*inv_cell_width))+2; // two extra cells so never wrap
+
+	int N = smallest_prime_atleast(n_min); // Make sure a prime
+	int M = smallest_prime_atleast(N*N);
+
+	printf("n_min = %d, N = %d, N2 = %d, M = %d\n", n_min, N, N*N, M);
+
+	
+	vector<int64_t> cells(num_pos);
+	find_lattice(pos, num_pos, inv_cell_width, N, M, cells.data());
+	
+//	for (int i=0; i<num_pos; ++i) cout << cells[i] << " ";
+//	cout << endl;
+
+	vector <int64_t> sort_idx(num_pos); // = {0,1,2,3,4}; // to be found by index_sorting
+	for (int i=0; i<num_pos; ++i) sort_idx[i] = i;
+
+	SimpleTimer T; 
+	T.reset(); T.start();
+	sort(sort_idx.begin(), sort_idx.end(), [&cells](unsigned int i, unsigned int j){return cells[i] < cells[j];}); 
+	T.stop(); T.printTime("sorting");
+
+//	for (int i=0; i<num_pos; ++i) cout << sort_idx[i] << " ";
+//	cout << endl;
+
+	
+	T.reset(); T.start();
+	vector <int32_t> domains(num_pos);
+	fof_link_cells(num_pos, N, M, rcut, 
+		   pos, cells.data(), 
+		   sort_idx.data(), domains.data());
+		   
+//	for (int i=0; i<num_pos; ++i) cout << domains[i] << " ";
+//	cout << endl;
+	T.stop(); T.printTime("fof");
+	
+	
+	group_ids.assign(domains.begin(), domains.end());
+	
+		
+
+}
+	
+
+
+
+
+#include "fof64.cppx"
+
+void PointCloud::group_grid_fof64(float Rg){
+
+//	SimpleTimer T; T.reset(); T.start();
+//	calcGridParams(Rg/sqrt(3), par);
+//	T.stop(); T.printTime("calcGrid");
+
+	
+	vector<double> pos_vec_d;
+	pos_vec_d.assign(points.begin(), points.end());
+	
+	double * pos = pos_vec_d.data();
+
+
+	int num_pos = nverts;
+	
+	float rcut = Rg;
+	
+	double minmax[6];	
+	get_min_max(pos, num_pos, minmax);
+	
+	float Lx = minmax[3]-minmax[0], Ly=minmax[4]-minmax[1], Lz=minmax[5]-minmax[2];
+	cout << "minmax: " << minmax[3] << "-" << minmax[0] << "," << minmax[4] << "-" << minmax[1] << "," <<  minmax[5] << "-" << minmax[2] << endl;
+	cout << "dx dy dz = " << Lx << " " << Ly << " " << Lz << endl;
+	float max_dim = fmax(fmax(Lx, Ly), Lz);
+	
+
+	float cell_width = rcut / sqrt(3);
+	float inv_cell_width = 1.0/cell_width;
+
+
+    float inv_block_width = 0.25 * inv_cell_width;
+    
+    int n_min = (int)(ceil(max_dim*inv_block_width))+2; // two extra cells so never wrap
+
+	int N = smallest_prime_atleast(n_min); // Make sure a prime
+	int M = smallest_prime_atleast(N*N);
+
+	printf("n_min = %d, N = %d, N2 = %d, M = %d\n", n_min, N, N*N, M);
+
+	
+	vector<int64_t> blockcells(num_pos);
+	blocks_cells(minmax[0], minmax[1], minmax[2], 
+		  pos, num_pos, 
+		  inv_cell_width, N, M, 
+		  blockcells.data());
+
+//	for (int i=0; i<num_pos; ++i) cout << blockcells[i] << " ";
+//	cout << endl;
+
+	vector <int64_t> sort_idx(num_pos); // = {0,1,2,3,4}; // to be found by index_sorting
+	for (int i=0; i<num_pos; ++i) sort_idx[i] = i;
+
+	SimpleTimer T; 
+	T.reset(); T.start();
+	sort(sort_idx.begin(), sort_idx.end(), [&blockcells](unsigned int i, unsigned int j){return blockcells[i] < blockcells[j];}); 
+	T.stop(); T.printTime("sorting");
+
+//	for (int i=0; i<num_pos; ++i) cout << sort_idx[i] << " ";
+//	cout << endl;
+
+
+	T.reset(); T.start();
+	vector <int32_t> domains(num_pos);
+	fof64(num_pos, N, M, num_pos, rcut, 
+		  pos, blockcells.data(), 
+		  sort_idx.data(), NULL,
+		  domains.data(), 0.6);
+	  
+	  		   
+//	for (int i=0; i<num_pos; ++i) cout << domains[i] << " ";
+//	cout << endl;
+	T.stop(); T.printTime("fof");
+	
+	
+	group_ids.assign(domains.begin(), domains.end());
+	
+		
+
+}
+	
+
+
+
+
+
+
+
+
+
+
+

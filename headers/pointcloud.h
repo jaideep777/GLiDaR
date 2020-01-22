@@ -69,6 +69,8 @@ class PointCloud{
 
 	public:
 	void read_las(string file);
+	void write_las(string file);
+	
 	void write_ascii(string file);
 	
 	void createDEM(float dx, float dy);
@@ -102,6 +104,8 @@ class PointCloud{
 	int3 mergeCells_hash_stl(int3 c1, int3 c2, float Rg, unordered_map<int3,int2,KeyHasher> &ht, vector <unsigned int> & pt_ids, int length);
 	void group_grid_hashSTL(float Rg);
 
+	void group_grid_fof(float Rg);
+	void group_grid_fof64(float Rg);
 
 	vector <int> neighbourCounts;
 	void countNeighbours(int c1, int c2, float Rd, map <int, int2> & cells, vector <unsigned int> & pt_ids, vector <int> &n_nb);
