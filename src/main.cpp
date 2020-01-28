@@ -84,7 +84,7 @@ int main(int argc, char **argv){
 	for (int i=0; i<cr.nverts; ++i){
 		if (cluster_size[cr.group_ids[i]] < 3){
 			cr.points[3*i+0] = cr.points[3*i+1] = cr.points[3*i+2] = 0;
-			cr.group_ids[i] = cr.nverts+1;
+//			cr.group_ids[i] = cr.nverts;
 		}
 	}
 
@@ -94,11 +94,6 @@ int main(int argc, char **argv){
 	for (int i=0; i<cr.nverts; ++i) sort_idx[i]=i;
 	sort(sort_idx.begin(), sort_idx.end(), [&cr](int a, int b){return cr.group_ids[a] < cr.group_ids[b];});
 	
-	for (int i=0; i<10000; ++i){
-		cout << cr.group_ids[sort_idx[i]] << " ";
-	}
-	cout << endl;
-
 	
 	vector <float> pos2(cr.nverts*3);
 	vector <float> gids2(cr.nverts);
@@ -108,13 +103,13 @@ int main(int argc, char **argv){
 		pos2[3*i+1] = cr.points[3*sort_idx[i]+1];
 		pos2[3*i+2] = cr.points[3*sort_idx[i]+2];
 		gids2[i] = cr.group_ids[sort_idx[i]];
-		clsiz[i] = cluster_size[gids2[i]];
+		clsiz[i] = log(1+cluster_size[gids2[i]]);	// log-ed for coloring
 	}
 	
 
 	cout << "----> Draw" << endl;	
 //	vector <float> cols9z = p.mapValues(gids2.data(), cr.nverts, 1, 0);	// map group ID
-	vector <float> cols9z = p.mapValues(clsiz.data(), cr.nverts, 1, 0, 10, 10000);	// map Cluster size
+	vector <float> cols9z = p.mapValues(clsiz.data(), cr.nverts, 1, 0);	// map Cluster size
 //	vector <float> cols9z = p.mapValues(cr.points.data(), cr.nverts, 3, 2, 0);	// map z
 
 	
