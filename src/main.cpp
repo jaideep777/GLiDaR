@@ -40,11 +40,14 @@ vector <int> z_slices(float * pos, int n, float res){
 }
 
 
-
+class Particle{
+	public:
+	float x,y,z;
+	int gid;
+	int cluster_size;
+};
 
 int main(int argc, char **argv){
-
-	initQuickGL(argc, argv);
 
 	cout << "----> Read Data" << endl;
 	PointCloud cr;
@@ -62,8 +65,8 @@ int main(int argc, char **argv){
 //	cr.write_las("data/2017-02-20_21-47-24_processed.las");
 	
 	Palette p(1000000);
-//	p.createRainbow();
-	p.createRandom();
+	p.createRainbow();
+//	p.createRandom();
 
 	cout << "----> Group... " << endl;
 	cr.group_grid_fof64(0.02);
@@ -79,19 +82,48 @@ int main(int argc, char **argv){
 	
 	// remove extremely small groups
 	for (int i=0; i<cr.nverts; ++i){
-		if (cluster_size[cr.group_ids[i]] < 3) cr.points[3*i+0] = cr.points[3*i+1] = cr.points[3*i+2] = 0;
+		if (cluster_size[cr.group_ids[i]] < 3){
+			cr.points[3*i+0] = cr.points[3*i+1] = cr.points[3*i+2] = 0;
+			cr.group_ids[i] = cr.nverts+1;
+		}
 	}
 
 
+	// sort by property
+	vector <int> sort_idx(cr.nverts);
+	for (int i=0; i<cr.nverts; ++i) sort_idx[i]=i;
+	sort(sort_idx.begin(), sort_idx.end(), [&cr](int a, int b){return cr.group_ids[a] < cr.group_ids[b];});
+	
+	for (int i=0; i<10000; ++i){
+		cout << cr.group_ids[sort_idx[i]] << " ";
+	}
+	cout << endl;
+
+	
+	vector <float> pos2(cr.nverts*3);
+	vector <float> gids2(cr.nverts);
+	vector <float> clsiz(cr.nverts);
+	for (int i=0; i<cr.nverts; ++i){
+		pos2[3*i+0] = cr.points[3*sort_idx[i]+0];
+		pos2[3*i+1] = cr.points[3*sort_idx[i]+1];
+		pos2[3*i+2] = cr.points[3*sort_idx[i]+2];
+		gids2[i] = cr.group_ids[sort_idx[i]];
+		clsiz[i] = cluster_size[gids2[i]];
+	}
+	
+
 	cout << "----> Draw" << endl;	
-	vector <float> gids(cr.group_ids.begin(), cr.group_ids.end());
-	vector <float> cols9z = p.mapValues(gids.data(), cr.nverts, 1, 0);	// map group ID
+//	vector <float> cols9z = p.mapValues(gids2.data(), cr.nverts, 1, 0);	// map group ID
+	vector <float> cols9z = p.mapValues(clsiz.data(), cr.nverts, 1, 0, 10, 10000);	// map Cluster size
 //	vector <float> cols9z = p.mapValues(cr.points.data(), cr.nverts, 3, 2, 0);	// map z
 
+	
+
+	initQuickGL(argc, argv);
 
 
 	Shape pt(cr.nverts, GL_POINTS); //, 4, -1, 1);
-	pt.setVertices(cr.points.data());	
+	pt.setVertices(pos2.data());	
 	pt.setColors(&cols9z[0]);
 	pt.autoExtent();
  
