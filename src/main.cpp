@@ -47,6 +47,16 @@ class Particle{
 	int cluster_size;
 };
 
+// given array of parents, find the root of q
+extern int root(int q, int* par);
+
+// check if p and q have same root, i.e. belong to same group
+extern bool find(int p, int q, int *par);
+
+// put p and q in same group by merging the smaller tree into large one
+extern void unite(int p, int q, int *par, int *sz);
+
+
 int main(int argc, char **argv){
 
 	cout << "----> Read Data" << endl;
@@ -65,8 +75,8 @@ int main(int argc, char **argv){
 //	cr.write_las("data/2017-02-20_21-47-24_processed.las");
 	
 	Palette p(1000000);
-	p.createRainbow();
-//	p.createRandom();
+//	p.createRainbow();
+	p.createRandom();
 
 	cout << "----> Group... " << endl;
 	cr.group_grid_fof64(0.02);
@@ -106,10 +116,23 @@ int main(int argc, char **argv){
 		clsiz[i] = log(1+cluster_size[gids2[i]]);	// log-ed for coloring
 	}
 	
+	// recreate clusters in O(N)
+	vector <int> parents(cr.nverts);
+	vector <int> ranks(cr.nverts,1);
+	for (int i=0; i<cr.nverts; ++i) parents[i] = i;
+
+	for (int j=0; j<cr.nverts-1; ++j){
+		if (gids2[j+1] == gids2[j]){
+			unite(j,j+1,parents.data(),ranks.data());
+		}
+	}
+	vector<float> gids3(cr.nverts);
+	for (int i=0; i<cr.nverts; ++i) gids3[i] = root(i, parents.data());
+	
 
 	cout << "----> Draw" << endl;	
-//	vector <float> cols9z = p.mapValues(gids2.data(), cr.nverts, 1, 0);	// map group ID
-	vector <float> cols9z = p.mapValues(clsiz.data(), cr.nverts, 1, 0);	// map Cluster size
+	vector <float> cols9z = p.mapValues(gids3.data(), cr.nverts, 1, 0);	// map group ID
+//	vector <float> cols9z = p.mapValues(clsiz.data(), cr.nverts, 1, 0);	// map Cluster size
 //	vector <float> cols9z = p.mapValues(cr.points.data(), cr.nverts, 3, 2, 0);	// map z
 
 	
