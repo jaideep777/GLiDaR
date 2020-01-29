@@ -44,17 +44,39 @@ class Particle{
 	public:
 	float x,y,z;
 	int gid;
-	int cluster_size;
+	int gsize;
+	int parent;
+	int rank;
 };
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Union-Find functions to calculate group Indices 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 // given array of parents, find the root of q
-extern int root(int q, int* par);
+int root(int q, Particle * pvec){
+	while (q != pvec[q].parent){					   // while (q != par[q])
+		pvec[q].parent = pvec[pvec[q].parent].parent;  // par[q] = par[par[q]]
+		q = pvec[q].parent;							   // q = par[q]
+	}
+	return q;
+}
 
 // check if p and q have same root, i.e. belong to same group
-extern bool find(int p, int q, int *par);
+bool find(int p, int q, Particle * pvec){
+	return root(p, pvec) == root(q, pvec);
+}
 
 // put p and q in same group by merging the smaller tree into large one
-extern void unite(int p, int q, int *par, int *sz);
+void unite(int p, int q, Particle * pvec){
+	int i = root(p, pvec);
+	int j = root(q, pvec);
+	if (i==j) return;	// if both already have the same root do nothing
+	if (pvec[i].rank < pvec[j].rank) {pvec[i].parent = j; pvec[j].rank += pvec[i].rank;}
+	else {pvec[j].parent = i; pvec[i].rank += pvec[j].rank; }
+}
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 int main(int argc, char **argv){
@@ -82,60 +104,79 @@ int main(int argc, char **argv){
 	cr.group_grid_fof64(0.02);
 //	cr.group_grid_hashSTL(0.05);
 
-	cout << "----> Denoise" << endl;	
 
-	// count connectivity
-	vector <int> cluster_size(cr.nverts, 0);
-	for (int i=0; i<cr.nverts; ++i){
-		++cluster_size[cr.group_ids[i]];
-	}
-	
-	// remove extremely small groups
-	for (int i=0; i<cr.nverts; ++i){
-		if (cluster_size[cr.group_ids[i]] < 3){
-			cr.points[3*i+0] = cr.points[3*i+1] = cr.points[3*i+2] = 0;
-//			cr.group_ids[i] = cr.nverts;
-		}
-	}
+	// -- POSTPROCESS --	
+	vector <Particle> pvec(cr.nverts);
 
-
-	// sort by property
+	// 1. sort by group id
 	vector <int> sort_idx(cr.nverts);
+	vector <int> gids2(cr.nverts);
 	for (int i=0; i<cr.nverts; ++i) sort_idx[i]=i;
 	sort(sort_idx.begin(), sort_idx.end(), [&cr](int a, int b){return cr.group_ids[a] < cr.group_ids[b];});
-	
-	
-	vector <float> pos2(cr.nverts*3);
-	vector <float> gids2(cr.nverts);
-	vector <float> clsiz(cr.nverts);
+
+	// save sorted gid array for easy access for now
 	for (int i=0; i<cr.nverts; ++i){
-		pos2[3*i+0] = cr.points[3*sort_idx[i]+0];
-		pos2[3*i+1] = cr.points[3*sort_idx[i]+1];
-		pos2[3*i+2] = cr.points[3*sort_idx[i]+2];
 		gids2[i] = cr.group_ids[sort_idx[i]];
-		clsiz[i] = log(1+cluster_size[gids2[i]]);	// log-ed for coloring
+	}
+
+	// 2. initialize ranks and parents and sorted points
+	for (int i=0; i<cr.nverts; ++i){
+		pvec[i].x = cr.points[3*sort_idx[i]+0];
+		pvec[i].y = cr.points[3*sort_idx[i]+1];
+		pvec[i].z = cr.points[3*sort_idx[i]+2];
+		pvec[i].parent = i;
+		pvec[i].rank = 1;
 	}
 	
-	// recreate clusters in O(N)
-	vector <int> parents(cr.nverts);
-	vector <int> ranks(cr.nverts,1);
-	for (int i=0; i<cr.nverts; ++i) parents[i] = i;
-
-	for (int j=0; j<cr.nverts-1; ++j){
+	// 3. re-construct grouping tree
+	for (int j=0; j<pvec.size()-1; ++j){
 		if (gids2[j+1] == gids2[j]){
-			unite(j,j+1,parents.data(),ranks.data());
+			unite(j,j+1, pvec.data());
 		}
 	}
-	vector<float> gids3(cr.nverts);
-	for (int i=0; i<cr.nverts; ++i) gids3[i] = root(i, parents.data());
+	
+	// 4. reassign groups
+	for (int j=0; j<pvec.size(); ++j){
+		pvec[j].gid = root(j, pvec.data());
+	}
+
+	// 5. count connectivity
+	vector <int> cluster_size(pvec.size(), 0);
+	for (int i=0; i<pvec.size(); ++i){
+		++cluster_size[pvec[i].gid];
+	}
+	for (int i=0; i<pvec.size(); ++i){
+		pvec[i].gsize = cluster_size[pvec[i].gid];
+	}
+	
+	// -----------------
 	
 
+	cout << "----> Denoise" << endl;	
+	
+	// remove extremely small groups
+	for (int i=0; i<pvec.size(); ++i){
+		if (pvec[i].gsize < 3){
+			pvec[i].x = pvec[i].y = pvec[i].z = 0;
+		}
+	}
+
+
 	cout << "----> Draw" << endl;	
+
+	vector<float> gids3(pvec.size());
+	vector<float> pos2(3*pvec.size());
+	for (int i=0; i<pvec.size(); ++i){
+		gids3[i] = pvec[i].gid;
+		pos2[3*i+0] = pvec[i].x;
+		pos2[3*i+1] = pvec[i].y;
+		pos2[3*i+2] = pvec[i].z;
+	}
+	
 	vector <float> cols9z = p.mapValues(gids3.data(), cr.nverts, 1, 0);	// map group ID
 //	vector <float> cols9z = p.mapValues(clsiz.data(), cr.nverts, 1, 0);	// map Cluster size
 //	vector <float> cols9z = p.mapValues(cr.points.data(), cr.nverts, 3, 2, 0);	// map z
 
-	
 
 	initQuickGL(argc, argv);
 
