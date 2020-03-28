@@ -1,10 +1,10 @@
-#include "../headers/pointcloud.h"
+#include "../include/pointcloud.h"
 using namespace std;
 #include "../utils/simple_math.h"
 #include "../utils/simple_timer.h"
 
-#include "../headers/hashtable.h"
-#include "../headers/pointcloud.h"
+#include "../include/hashtable.h"
+#include "../include/pointcloud.h"
 
 #include <unordered_map>
 

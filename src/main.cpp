@@ -5,10 +5,13 @@
 #include <algorithm>
 using namespace std;
 
-#include <quickgl.h>
+#include"../include/quickgl.h"
 
 
-#include "../headers/pointcloud.h"
+#include "../include/pointcloud.h"
+
+
+void processInput(GLFWwindow *window);
 
 
 vector <int> y_slices(float * pos, int n, float res){
@@ -51,7 +54,7 @@ int main(int argc, char **argv){
 
 	cout << "----> Read Data" << endl;
 	PointCloud cr;
-	cr.read_las("data/2017-02-20_21-47-24.las");
+	cr.read_las("/Users/sachita/Documents/treeseg_project/2017-02-20_21-47-24.las");
 
 	cout << "----> Create DEM" << endl;
 	cr.createDEM(0.5,0.5);
@@ -65,8 +68,8 @@ int main(int argc, char **argv){
 //	cr.write_las("data/2017-02-20_21-47-24_processed.las");
 	
 	Palette p(1000000);
-	p.createRainbow();
-//	p.createRandom();
+	//p.createRainbow();
+	p.createRandom();
 
 	cout << "----> Group... " << endl;
 	cr.group_grid_fof64(0.02);
@@ -108,18 +111,35 @@ int main(int argc, char **argv){
 	
 
 	cout << "----> Draw" << endl;	
-//	vector <float> cols9z = p.mapValues(gids2.data(), cr.nverts, 1, 0);	// map group ID
-	vector <float> cols9z = p.mapValues(clsiz.data(), cr.nverts, 1, 0);	// map Cluster size
+	vector <float> cols9z = p.mapValues(gids2.data(), cr.nverts, 1, 0);	// map group ID
+//  vector <float> cols9z = p.mapValues(clsiz.data(), cr.nverts, 1, 0);	// map Cluster size
 //	vector <float> cols9z = p.mapValues(cr.points.data(), cr.nverts, 3, 2, 0);	// map z
 
 	
 
-	initQuickGL(argc, argv);
+	initQuickGL();
 
 
-	Shape pt(cr.nverts, GL_POINTS); //, 4, -1, 1);
-	pt.setVertices(pos2.data());	
-	pt.setColors(&cols9z[0]);
+	// Vectors to sample points randomly and store them
+	vector <float> vertices_sampled(3*cr.nverts/10);
+	vector <float> gids_sampled(cr.nverts/10);
+
+	for(int iter=0; iter<cr.nverts/10; iter++){
+
+		vertices_sampled[3*iter+0] = pos2[3*iter*10+0];
+		vertices_sampled[3*iter+1] = pos2[3*iter*10+1];
+		vertices_sampled[3*iter+2] = pos2[3*iter*10+2];
+
+		gids_sampled[iter] = gids2[iter*10];
+
+	}
+
+	// Map gid to colour
+	vector <float> colours_sampled = p.mapValues(gids_sampled.data(), cr.nverts/10, 1, 0);	// map group ID
+
+	Shape pt(cr.nverts/10, GL_POINTS); //, 4, -1, 1);
+	pt.setVertices(vertices_sampled.data());	
+	pt.setColors(colours_sampled.data());
 	pt.autoExtent();
  
  
@@ -161,7 +181,7 @@ int main(int argc, char **argv){
 	Camera cam(glm::vec3(2.f,2.f,2.f), glm::vec3(0.5f, 0.5f, 0.f), glm::vec3(0.0f, 0.0f, 1.0f));
 	cam.activate();
 
-	CameraController c;
+	// CameraController c;
 
 	
 //	while(1){	   // infinite loop needed to poll anim_on signal.
@@ -170,12 +190,49 @@ int main(int argc, char **argv){
 ////		cout << "Currently rendering: " << current_render << "\n";
 //		slices_shapes[current_render]->b_render = true;
 		
-		glutMainLoop();
+		// glutMainLoop();
 //		usleep(20000);
 //	}
 	// launch sim end.
-	
+
+	while (!glfwWindowShouldClose(window))
+    {
+        // input
+        // -----
+        processInput(window);
+
+        // render
+        // ------
+        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+//        // draw our first triangle
+//        glUseProgram(shaderProgram);
+//        glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
+//        //glDrawArrays(GL_TRIANGLES, 0, 6);
+//        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0); //points: GL_POINTS
+//        // glBindVertexArray(0); // no need to unbind it every time 
+ 		pt.render();
+ 		axis.render();
+ 		
+        // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+        // -------------------------------------------------------------------------------
+        glfwSwapBuffers(window);
+        //glfwPollEvents();
+        glfwWaitEvents();
+    }
+
+
 	return 0;
 }
+
+// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
+// ---------------------------------------------------------------------------------------------------------
+void processInput(GLFWwindow *window)
+{
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
+}
+
 
 

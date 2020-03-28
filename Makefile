@@ -15,19 +15,19 @@ CUFILES  :=  $(wildcard src/*.cu) # src/neighbourcount.cu #
 # compilers
 
 # include and lib dirs (esp for cuda)
-INC_PATH := -I/home/jaideep/codes/quickGL/include #-I/usr/local/liblas/include #-I/usr/local/cuda/include 
-LIB_PATH := -L/home/jaideep/codes/quickGL/lib #-L/usr/local/liblas/lib #-L/usr/local/cuda/lib64
+INC_PATH := -I./include #-I/home/jaideep/codes/quickGL/include #-I/usr/local/liblas/include #-I/usr/local/cuda/include 
+LIB_PATH := #-L/home/jaideep/codes/quickGL/lib #-L/usr/local/liblas/lib #-L/usr/local/cuda/lib64
 GLLIB_PATH := 
 
 # flags
 COMMONFLAGS = -m64 
-CPPFLAGS = -O3 -std=c++11 #-fPIC -Wl,--no-as-needed 
+CPPFLAGS = -O3 -std=c++11 -Wno-c++11-narrowing #-fPIC -Wl,--no-as-needed 
 LINKFLAGS += $(COMMONFLAGS) 
 NVFLAGS = -Wno-deprecated-gpu-targets -Xcompiler -O3 -std=c++11 -dc -x cu 	#-Xcompiler -fPIC
 
 # libs
 #LIBS = -lcudart 					# cuda libs 		-lcutil_x86_64 -lshrutil_x86_64
-GLLIBS = -lquickgl -lGL -lglut -lGLU -lGLEW 				# openGL libs       -lGL -lGLEW  #-lX11 -lXi -lXmu 		
+GLLIBS = -lglfw -ldl  				# openGL libs       -lGL -lGLEW  #-lX11 -lXi -lXmu 		
 LIBS = 	 -llas	# additional libs
 CUDALIBS = #-lcudart 
 

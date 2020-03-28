@@ -1,4 +1,4 @@
-#include "../headers/pointcloud.h"
+#include "../include/pointcloud.h"
 #include <cmath>
 #include <liblas/liblas.hpp>
 #include "../utils/simple_math.h"

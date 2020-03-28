@@ -1,14 +1,11 @@
-#version 130
+#version 330 core
 
-in  vec2 ex_UV;
-in  vec4 ex_col;
+in vec4 exCol;
+out vec4 FragColor;
 
-out vec4 outColor;
-
-uniform sampler2D tex;
-
-void main()
-{	
-	outColor = mix(texture(tex, ex_UV), ex_col, .99); 
+void main(){
+   FragColor = exCol;
+   // FragColor = vec4(1.0f, 0.5f, 0.5f, 1.0f);
 }
+
 
