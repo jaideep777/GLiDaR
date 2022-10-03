@@ -56,8 +56,8 @@ class Particle{
 // given array of parents, find the root of q
 int root(int q, Particle * pvec){
 	while (q != pvec[q].parent){					   // while (q != par[q])
-		pvec[q].parent = pvec[pvec[q].parent].parent;  // par[q] = par[par[q]]
-		q = pvec[q].parent;							   // q = par[q]
+		pvec[q].parent = pvec[pvec[q].parent].parent;  // par[q] = par[par[q]]  // perform path-compression on the go
+		q = pvec[q].parent;							   // q = par[q]            
 	}
 	return q;
 }
@@ -148,15 +148,34 @@ int main(int argc, char **argv){
 	for (int i=0; i<pvec.size(); ++i){
 		pvec[i].gsize = cluster_size[pvec[i].gid];
 	}
+
 	
+	// output processed cloud to file
+	ofstream fout("data/processed_particles.txt");
+	fout <<  "x" << "\t" << "y" << "\t" << "z" << "\t"
+		 <<  "gid" << "\t"
+		 <<  "gsize" << "\t"
+		 <<  "parent" << "\t"
+		 <<  "rank" << "\n";
+	
+	for (auto p : pvec){
+		fout <<  p.x << "\t" << p.y << "\t" << p.z  << "\t"
+			 <<  p.gid << "\t"
+			 <<  p.gsize << "\t"
+			 <<  p.parent << "\t"
+			 <<  p.rank << "\n";
+	}
+	fout.close();
+		
 	// -----------------
 	
+
 
 	cout << "----> Denoise" << endl;	
 	
 	// remove extremely small groups
 	for (int i=0; i<pvec.size(); ++i){
-		if (pvec[i].gsize < 3){
+		if (pvec[i].gsize < 20){
 			pvec[i].x = pvec[i].y = pvec[i].z = 0;
 		}
 	}
@@ -238,7 +257,8 @@ int main(int argc, char **argv){
 //		usleep(20000);
 //	}
 	// launch sim end.
-	
+
+
 	return 0;
 }
 
