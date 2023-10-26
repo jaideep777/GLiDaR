@@ -15,8 +15,8 @@ CUFILES  :=  $(wildcard src/*.cu) # src/neighbourcount.cu #
 # compilers
 
 # include and lib dirs (esp for cuda)
-INC_PATH := -I/home/jaideep/codes/quickGL/include #-I/usr/local/liblas/include #-I/usr/local/cuda/include 
-LIB_PATH := -L/home/jaideep/codes/quickGL/lib #-L/usr/local/liblas/lib #-L/usr/local/cuda/lib64
+INC_PATH := -I/home/jjoshi/codes/QuickGL/include -I/usr/local/liblas/include #-I/usr/local/cuda/include 
+LIB_PATH := -L/home/jjoshi/codes/QuickGL/lib -L/usr/local/liblas/lib #-L/usr/local/cuda/lib64
 GLLIB_PATH := 
 
 # flags

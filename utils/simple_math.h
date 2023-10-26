@@ -49,6 +49,70 @@ class float3{
 // =============================================================================
 
 
+
+namespace fl{
+
+class vec3{
+	public:
+	float x = 0;
+	float y = 0;
+	float z = 0;
+
+	inline vec3& operator += (const vec3& rhs){
+		x += rhs.x; 
+		y += rhs.y; 
+		z += rhs.z; 
+		return *this;
+	}
+
+	inline vec3& operator -= (const vec3& rhs){
+		x -= rhs.x; 
+		y -= rhs.y; 
+		z -= rhs.z; 
+		return *this;
+	}
+
+	inline vec3& operator *= (const vec3& rhs){
+		x *= rhs.x; 
+		y *= rhs.y; 
+		z *= rhs.z; 
+		return *this;
+	}
+
+	inline vec3& operator /= (const float& rhs){
+		x /= rhs; 
+		y /= rhs; 
+		z /= rhs; 
+		return *this;
+	}
+
+};
+
+inline vec3 operator + (vec3 lhs, const vec3& rhs){
+	lhs += rhs;
+	return lhs;
+}
+
+inline vec3 operator - (vec3 lhs, const vec3& rhs){
+	lhs -= rhs;
+	return lhs;
+}
+
+inline vec3 operator * (vec3 lhs, const vec3& rhs){
+	lhs *= rhs;
+	return lhs;
+}
+
+inline vec3 operator / (vec3 lhs, const float& rhs){
+	lhs /= rhs;
+	return lhs;
+}
+
+
+
+}
+
+
 inline DEVICE_NAME bool operator==(const int3& a, const int3& b){
 	return (a.x == b.x && a.y== b.y && a.z == b.z);
 }

@@ -1,5 +1,7 @@
 #include "../headers/pointcloud.h"
 #include <cmath>
+#include <algorithm>
+#include <numeric>
 #include <liblas/liblas.hpp>
 #include "../utils/simple_math.h"
 
@@ -10,11 +12,23 @@ bool compare_z(const fl::vec3& p1, const fl::vec3& p2){
 	return (p1.z < p2.z);
 }
 
+bool compare_z1(const Point& p1, const Point& p2){
+	return (p1.z < p2.z);
+}
+
 bool compare_y(const fl::vec3& p1, const fl::vec3& p2){
 	return (p1.y < p2.y);
 }
 
+bool compare_y1(const Point& p1, const Point& p2){
+	return (p1.y < p2.y);
+}
+
 bool compare_x(const fl::vec3& p1, const fl::vec3& p2){
+	return (p1.x < p2.x);
+}
+
+bool compare_x1(const Point& p1, const Point& p2){
 	return (p1.x < p2.x);
 }
 
@@ -102,17 +116,43 @@ void PointCloud::read_las(string file){
 	cout << "Points count: " << header.GetPointRecordsCount() << '\n';
 	nverts = header.GetPointRecordsCount();
 
-	points.reserve(3*nverts);
+	points_vec.reserve(nverts);
 	
 	while (reader.ReadNextPoint()){ //count<10
 		liblas::Point const& p = reader.GetPoint();
-		points.push_back(p.GetX());
-		points.push_back(p.GetY());
-		points.push_back(p.GetZ());
+		liblas::Color const& c = p.GetColor();
 
-		//cout << p.GetX() << ", " << p.GetY() << ", " << p.GetZ() << "\n";
+		Point P;
+		P.x = p.GetX();
+		P.y = p.GetY();
+		P.z = p.GetZ();
+
+		P.r = c.GetRed()/65535.f;
+		P.g = c.GetGreen()/65535.f;
+		P.b = c.GetBlue()/65535.f;
+		P.a = 1;
+
+		points_vec.push_back(P);
+		//cout << c.GetRed() << ", " << c.GetBlue() << ", " << c.GetGreen() << "\n";
 	}
 
+	copyPosCols();
+}
+
+void PointCloud::copyPosCols(){
+	nverts = points_vec.size();
+	points.resize(3*nverts);
+	cols.resize(4*nverts);
+	for (int i=0; i<nverts; ++i){
+		points[3*i+0] = points_vec[i].x;
+		points[3*i+1] = points_vec[i].y;
+		points[3*i+2] = points_vec[i].z;
+
+		cols[4*i+0] = points_vec[i].r;
+		cols[4*i+1] = points_vec[i].g;
+		cols[4*i+2] = points_vec[i].b;
+		cols[4*i+3] = points_vec[i].a;
+	}
 }
 
 void PointCloud::write_las(string file){
@@ -310,5 +350,88 @@ float PointCloud::distance(int p, int q){
 	return sqrt(dx*dx + dy*dy + dz*dz);
 }
 
+
+void PointCloud::remove_outliers(double lo, double hi){
+	// Based on percentiles
+	std::sort(points_vec.begin(), points_vec.end(), compare_z1);
+	for (int i=0; i<nverts*lo; ++i){
+		points_vec[i].quality_good = false;
+	}
+	for (int i=nverts*hi; i<nverts; ++i){
+		points_vec[i].quality_good = false;
+	}
+
+	std::sort(points_vec.begin(), points_vec.end(), compare_y1);
+	for (int i=0; i<nverts*lo; ++i){
+		points_vec[i].quality_good = false;
+	}
+	for (int i=nverts*hi; i<nverts; ++i){
+		points_vec[i].quality_good = false;
+	}
+
+	std::sort(points_vec.begin(), points_vec.end(), compare_x1);
+	for (int i=0; i<nverts*lo; ++i){
+		points_vec[i].quality_good = false;
+	}
+	for (int i=nverts*hi; i<nverts; ++i){
+		points_vec[i].quality_good = false;
+	}
+
+	points_vec.erase(std::remove_if(points_vec.begin(), points_vec.end(), [](const Point& P){return !P.quality_good;}), points_vec.end());
+	copyPosCols();
+
+	// Based on mean and SD
+	// fl::vec3 xmean = accumulate((fl::vec3*)pos, (fl::vec3*)(pos+nverts), fl::vec3());
+	// xmean /= nverts;
+
+	// cout << "mean: " << xmean.x << " " << xmean.y << " " << xmean.z << endl;
+
+	// vector<float> diff(points.size());
+	// float3 * pdiff = (float3*)diff.data();
+	// std::transform((fl::vec3*)pos, (fl::vec3*)(pos+nverts), (fl::vec3*)pdiff, [xmean](fl::vec3 x) { return (x - xmean)*(x-xmean); });	
+
+	// fl::vec3 sq_sum = std::accumulate((fl::vec3*)pdiff, (fl::vec3*)(pdiff+nverts), fl::vec3()) / nverts;
+	// cout << "here" << endl;
+	
+	// fl::vec3 stdev; 
+	// stdev.x = std::sqrt(sq_sum.x);
+	// stdev.y = std::sqrt(sq_sum.y);
+	// stdev.z = std::sqrt(sq_sum.z);
+
+	// cout << "sd: " << stdev.x << " " << stdev.y << " " << stdev.z << "\n";
+
+	// for (int i=0; i<nverts; ++i){
+	// 	points[3*i+0] -= xmean.x;
+	// 	points[3*i+1] -= xmean.y;
+	// 	points[3*i+2] -= xmean.z;
+
+	// 	if (fabs(points[3*i+0]) > ns*stdev.x || 
+	// 	    fabs(points[3*i+1]) > ns*stdev.y || 
+	// 		fabs(points[3*i+2]) > ns*stdev.z ){
+
+	// 			points[3*i+0] = 0; //xmean.x;
+	// 			points[3*i+1] = 0; //xmean.y;
+	// 			points[3*i+2] = 359; //xmean.z;
+	// 	}
+
+	// 	// if (fabs(cols[4*i+0]) > 0.8 && 
+	// 	//     fabs(cols[4*i+1]) > 0.8 && 
+	// 	// 	fabs(cols[4*i+2]) > 0.8 ){
+
+	// 	// 		points[3*i+0] = 0; //xmean.x;
+	// 	// 		points[3*i+1] = 0; //xmean.y;
+	// 	// 		points[3*i+2] = 359; //xmean.z;
+	// 	// }
+
+	// 	// remove green
+	// 	if (fabs(cols[4*i+1]) > 0.4){
+
+	// 			points[3*i+0] = 0; //xmean.x;
+	// 			points[3*i+1] = 0; //xmean.y;
+	// 			points[3*i+2] = 359; //xmean.z;
+	// 	}
+
+	// }
+}
 
 

@@ -12,18 +12,6 @@ using namespace std;
 #include "grid.h"
 
 
-
-namespace fl{
-
-class vec3{
-	public:
-	float x;
-	float y;
-	float z;
-};
-
-}
-
 bool compare_z(const fl::vec3& p1, const fl::vec3& p2);
 bool compare_y(const fl::vec3& p1, const fl::vec3& p2);
 bool compare_x(const fl::vec3& p1, const fl::vec3& p2);
@@ -32,6 +20,18 @@ void sort_by_z(float* begin, float* end);
 void sort_by_y(float* begin, float* end);	
 void sort_by_x(float* begin, float* end);
 
+class Point{
+	public:
+	float x,y,z;
+	float r,g,b,a;
+
+	int gid;
+	int gsize;
+	int parent;
+	int rank;
+
+	bool quality_good = true;
+};
 
 
 class DigitalElevModel{
@@ -64,11 +64,16 @@ class PointCloud{
 //	float dx,dy;
 //	int nx,ny;
 	vector <float> points;
+	vector <float> cols;
+
+	vector<Point> points_vec;
 
 	DigitalElevModel dem;
 
 	public:
 	void read_las(string file);
+	void copyPosCols();
+	
 	void write_las(string file);
 	
 	void write_ascii(string file);
@@ -113,6 +118,8 @@ class PointCloud{
 	void denoise(float Rd);
 	
 	void countNeighbours_hash_gpu(float Rd);
+
+	void remove_outliers(double lo = 0.00001, double hi=0.99999);
 
 };
 
